@@ -32,7 +32,7 @@ app.use(morgan("dev"));
 
 // CORS setup
 const allowedOrigins = [
-  "http://localhost:5173", 
+  "http://localhost:5173",
   "https://gratheracademy.netlify.app"
 ];
 
@@ -42,6 +42,7 @@ app.use(
       if (!origin || allowedOrigins.includes(origin)) {
         callback(null, true);
       } else {
+        console.warn("Blocked by CORS:", origin);
         callback(new Error("Not allowed by CORS"));
       }
     },
@@ -49,20 +50,16 @@ app.use(
   })
 );
 
-//Static uploads with CORP headers
+// Static uploads with CORP headers
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
-
-const allowedUploadOrigins = [
-  "http://localhost:5173",
-  "https://gratheracademy.netlify.app"
-];
 
 app.use(
   "/uploads",
   express.static(path.join(__dirname, "uploads"), {
-    setHeaders: (res) => {
-      res.setHeader("Access-Control-Allow-Origin", allowedUploadOrigins.join(","));
+    setHeaders: (res, path, stat) => {
+      // Allow both localhost and Netlify
+      res.setHeader("Access-Control-Allow-Origin", allowedOrigins.join(","));
       res.setHeader("Access-Control-Allow-Credentials", "true");
       res.setHeader("Cross-Origin-Resource-Policy", "cross-origin");
       res.setHeader("Cross-Origin-Embedder-Policy", "require-corp");
