@@ -30,11 +30,8 @@ app.use(express.json());
 app.use(helmet());
 app.use(morgan("dev"));
 
-// ✅ CORS setup
-const allowedOrigins = [
-  "http://localhost:5173",
-  "https://gratheracademy.netlify.app"
-];
+// ✅ CORS setup (production only)
+const allowedOrigins = ["https://gratheracademy.netlify.app"];
 
 app.use(
   cors({
