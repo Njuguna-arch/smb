@@ -25,12 +25,7 @@ connectDB();
 
 const app = express();
 
-// Middleware
-app.use(express.json());
-app.use(helmet());
-app.use(morgan("dev"));
-
-// ✅ CORS setup (production only)
+// ✅ CORS setup
 const allowedOrigins = ["https://gratheracademy.netlify.app"];
 
 app.use(
@@ -46,6 +41,11 @@ app.use(
     credentials: true,
   })
 );
+
+// Middleware
+app.use(express.json());
+app.use(helmet());
+app.use(morgan("dev"));
 
 // ✅ Static uploads with CORP headers
 const __filename = fileURLToPath(import.meta.url);
