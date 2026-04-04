@@ -30,7 +30,7 @@ app.use(express.json());
 app.use(helmet());
 app.use(morgan("dev"));
 
-// CORS setup
+// ✅ CORS setup
 const allowedOrigins = [
   "http://localhost:5173",
   "https://gratheracademy.netlify.app"
@@ -50,7 +50,7 @@ app.use(
   })
 );
 
-// Static uploads with CORP headers
+// ✅ Static uploads with CORP headers
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
@@ -58,8 +58,10 @@ app.use(
   "/uploads",
   express.static(path.join(__dirname, "uploads"), {
     setHeaders: (res, path, stat) => {
-      // Allow both localhost and Netlify
-      res.setHeader("Access-Control-Allow-Origin", allowedOrigins.join(","));
+      const origin = res.req.headers.origin;
+      if (allowedOrigins.includes(origin)) {
+        res.setHeader("Access-Control-Allow-Origin", origin);
+      }
       res.setHeader("Access-Control-Allow-Credentials", "true");
       res.setHeader("Cross-Origin-Resource-Policy", "cross-origin");
       res.setHeader("Cross-Origin-Embedder-Policy", "require-corp");
