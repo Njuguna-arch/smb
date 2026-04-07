@@ -3,6 +3,8 @@ import Discipline from "../models/Discipline.js";
 import User from "../models/User.js";
 import fs from "fs";
 import csv from "csv-parser";
+
+// Upload exam results from CSV
 const uploadExamCSV = async (req, res) => {
   try {
     const results = [];
@@ -51,6 +53,7 @@ const uploadExamCSV = async (req, res) => {
   }
 };
 
+// Add discipline comment
 const addDisciplineComment = async (req, res) => {
   const { studentId, comment } = req.body;
   try {
@@ -65,6 +68,7 @@ const addDisciplineComment = async (req, res) => {
   }
 };
 
+// Get class performance for teacher
 const getClassPerformance = async (req, res) => {
   try {
     const teacherClass = req.user?.className || req.user?.grade;
@@ -81,21 +85,22 @@ const getClassPerformance = async (req, res) => {
 
     console.log("🔍 Match stage:", matchStage);
 
+    // Subject averages
     const subjectAverages = await ExamResult.aggregate([
       { $match: matchStage },
       { $unwind: "$subjectResults" },
       {
         $match: {
-          "subjectResults.subjectName": { $exists: true, $ne: "" },
-          "subjectResults.marks": { $exists: true, $ne: null },
+          "subjectResults.subject": { $exists: true, $ne: "" },
+          "subjectResults.score": { $exists: true, $ne: null },
         },
       },
       {
         $project: {
-          subject: "$subjectResults.subjectName",
+          subject: "$subjectResults.subject",
           score: {
             $convert: {
-              input: "$subjectResults.marks",
+              input: "$subjectResults.score",
               to: "double",
               onError: 0,
               onNull: 0,
@@ -118,20 +123,21 @@ const getClassPerformance = async (req, res) => {
       },
     ]);
 
+    // Overall performance
     const overall = await ExamResult.aggregate([
       { $match: matchStage },
       { $unwind: "$subjectResults" },
       {
         $match: {
-          "subjectResults.subjectName": { $exists: true, $ne: "" },
-          "subjectResults.marks": { $exists: true, $ne: null },
+          "subjectResults.subject": { $exists: true, $ne: "" },
+          "subjectResults.score": { $exists: true, $ne: null },
         },
       },
       {
         $project: {
           score: {
             $convert: {
-              input: "$subjectResults.marks",
+              input: "$subjectResults.score",
               to: "double",
               onError: 0,
               onNull: 0,
@@ -162,6 +168,7 @@ const getClassPerformance = async (req, res) => {
   }
 };
 
+// Get student completed quizzes
 const getStudentCompletedQuizzes = async (req, res) => {
   try {
     const { studentId } = req.params;
