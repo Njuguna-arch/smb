@@ -25,7 +25,7 @@ connectDB();
 
 const app = express();
 
-// ✅ CORS setup
+// CORS setup
 const allowedOrigins = ["https://gratheracademy.netlify.app"];
 
 app.use(
@@ -47,13 +47,14 @@ app.use(express.json());
 app.use(helmet());
 app.use(morgan("dev"));
 
-// ✅ Static uploads with CORP headers
+// Static uploads with CORP headers
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
+// IMPORTANT: point to ../uploads since server.js is inside src
 app.use(
   "/uploads",
-  express.static(path.join(__dirname, "uploads"), {
+  express.static(path.join(__dirname, "../uploads"), {
     setHeaders: (res) => {
       const origin = res.req.headers.origin;
       if (allowedOrigins.includes(origin)) {
