@@ -35,7 +35,7 @@ const userSchema = new mongoose.Schema(
     },
 
     grade: { type: String, trim: true },
-    photoUrl: { type: String },
+    photoUrl: { type: String, default: "default-avatar.png" },
 
     gender: {
       type: String,
