@@ -26,7 +26,7 @@ connectDB();
 const app = express();
 
 // CORS setup
-const allowedOrigins = ["https://gratheracademy.netlify.app"];
+const allowedOrigins = ["https://gratheracademy.netlify.app", "http://localhost:3000" ];
 
 app.use(
   cors({
