@@ -39,7 +39,6 @@ const computeOverallGrade = (subjectResults) => {
   return getCBEGrade(avgMarks);
 };
 
-// 🔹 Upload exam results from CSV
 const uploadExamResults = async (req, res) => {
   try {
     if (!req.file) {
@@ -67,7 +66,7 @@ const uploadExamResults = async (req, res) => {
                   subjectName: key,
                   marks,
                   grade,
-                  points: getPointsFromGrade(grade),   // 🔹 compute points from grade
+                  points: getPointsFromGrade(grade),
                 });
               }
             }
@@ -115,8 +114,30 @@ const uploadExamResults = async (req, res) => {
 
     await ExamResult.insertMany(toInsert);
 
+    // After inserting, calculate positions
+    const { examType, term, year } = toInsert[0]; // assume all rows same exam
+    const className = toInsert[0].className;
+
+    const classResults = await ExamResult.find({ examType, term, year, className });
+
+    // Compute total points
+    const ranked = classResults.map((r) => {
+      const totalPoints = r.subjectResults.reduce((sum, subj) => {
+        return sum + getPointsFromGrade(subj.grade);
+      }, 0);
+      return { id: r._id, admissionNumber: r.admissionNumber, totalPoints };
+    });
+
+    // Sort descending
+    ranked.sort((a, b) => b.totalPoints - a.totalPoints);
+
+    // Assign positions
+    for (let i = 0; i < ranked.length; i++) {
+      await ExamResult.findByIdAndUpdate(ranked[i].id, { position: i + 1 });
+    }
+
     res.json({
-      message: "Exam results uploaded successfully",
+      message: "Exam results uploaded successfully and positions calculated",
       count: toInsert.length,
     });
   } catch (err) {
@@ -125,17 +146,52 @@ const uploadExamResults = async (req, res) => {
   }
 };
 
-// 🔹 Fetch student results
 const getStudentResults = async (req, res) => {
   try {
     const admissionNumber = req.params.admissionNumber;
+
+    // Fetch all results for this student
     const results = await ExamResult.find({ admissionNumber }).sort({ createdAt: -1 });
+
+    if (!results || results.length === 0) {
+      return res.json([]);
+    }
+
+    // For each exam, calculate position within the class
+    for (const exam of results) {
+      const classResults = await ExamResult.find({
+        examType: exam.examType,
+        term: exam.term,
+        year: exam.year,
+        className: exam.className,
+      });
+
+      // Compute total points for each student
+      const ranked = classResults.map((r) => {
+        const totalPoints = r.subjectResults.reduce((sum, subj) => {
+          return sum + getPointsFromGrade(subj.grade);
+        }, 0);
+        return { admissionNumber: r.admissionNumber, totalPoints };
+      });
+
+      // Sort descending
+      ranked.sort((a, b) => b.totalPoints - a.totalPoints);
+
+      // Assign position
+      ranked.forEach((r, idx) => {
+        if (r.admissionNumber === exam.admissionNumber) {
+          exam.position = idx + 1;
+        }
+      });
+    }
+
     res.json(results);
   } catch (err) {
     console.error("Error fetching student results:", err.message);
     res.status(500).json({ message: "Server error" });
   }
 };
+
 
 const getExamResultPDF = async (req, res) => {
   const { admissionNumber, examType, term, year } = req.params;
@@ -148,6 +204,34 @@ const getExamResultPDF = async (req, res) => {
       return res.status(404).json({ message: "Exam not found" });
     }
 
+    // 🔹 Fetch all classmates for this exam
+    const classResults = await ExamResult.find({
+      examType,
+      term,
+      year,
+      className: exam.className,
+    });
+
+    // 🔹 Compute total points for each student
+    const ranked = classResults.map((r) => {
+      const totalPoints = r.subjectResults.reduce((sum, subj) => {
+        return sum + getPointsFromGrade(subj.grade);
+      }, 0);
+      return { admissionNumber: r.admissionNumber, totalPoints };
+    });
+
+    // 🔹 Sort descending
+    ranked.sort((a, b) => b.totalPoints - a.totalPoints);
+
+    // 🔹 Assign position
+    let position = "N/A";
+    ranked.forEach((r, idx) => {
+      if (r.admissionNumber === exam.admissionNumber) {
+        position = idx + 1;
+      }
+    });
+
+    // 🔹 Generate PDF
     res.setHeader("Content-Type", "application/pdf");
     res.setHeader(
       "Content-Disposition",
@@ -162,6 +246,7 @@ const getExamResultPDF = async (req, res) => {
     doc.fontSize(12).text(`Student: ${exam.studentId?.name || "N/A"}`);
     doc.text(`Admission Number: ${exam.admissionNumber}`);
     doc.text(`Overall Grade: ${exam.overallGrade || "N/A"}`);
+    doc.text(`Position: ${position}`); 
     doc.moveDown();
 
     const tableTop = doc.y;
@@ -177,36 +262,35 @@ const getExamResultPDF = async (req, res) => {
     doc.font("Helvetica");
 
     let rowY = tableTop + 20;
-exam.subjectResults.forEach((subj) => {
-  const points = getPointsFromGrade(subj.grade);
+    exam.subjectResults.forEach((subj) => {
+      const points = getPointsFromGrade(subj.grade);
 
-  doc.text(subj.subjectName, 50, rowY, { width: colWidths[0], align: "center" });
-  doc.text(subj.marks.toString(), 200, rowY, { width: colWidths[1], align: "center" });
-  doc.text(subj.grade, 300, rowY, { width: colWidths[2], align: "center" });
-  doc.text(points.toString(), 400, rowY, { width: colWidths[3], align: "center" });
+      doc.text(subj.subjectName, 50, rowY, { width: colWidths[0], align: "center" });
+      doc.text(subj.marks.toString(), 200, rowY, { width: colWidths[1], align: "center" });
+      doc.text(subj.grade, 300, rowY, { width: colWidths[2], align: "center" });
+      doc.text(points.toString(), 400, rowY, { width: colWidths[3], align: "center" });
 
-  rowY += 20;
-});
+      rowY += 20;
+    });
 
-doc.moveDown(2);
+    doc.moveDown(2);
 
-const pageWidth = doc.page.width;
-const margin = doc.page.margins.left;
+    const pageWidth = doc.page.width;
+    const margin = doc.page.margins.left;
 
-doc.font("Helvetica-Bold")
-   .text(`Teacher's Comment: ${exam.overallComment || "N/A"}`, margin, doc.y, {
-     width: pageWidth - margin * 2,
-     align: "center"
-   });
+    doc.font("Helvetica-Bold")
+       .text(`Teacher's Comment: ${exam.overallComment || "N/A"}`, margin, doc.y, {
+         width: pageWidth - margin * 2,
+         align: "center"
+       });
 
-doc.end();
+    doc.end();
 
   } catch (err) {
     console.error("Error generating PDF:", err);
     res.status(500).json({ message: "Failed to generate PDF" });
   }
 };
-
 
 const getAllUploadedExams = async (req, res) => {
   try {

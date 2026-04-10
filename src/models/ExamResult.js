@@ -60,6 +60,11 @@ const examResultSchema = new mongoose.Schema(
       required: true,
       index: true,
     },
+
+    position: {
+      type: Number,
+      default: null,
+    },
   },
   { timestamps: true }
 );
