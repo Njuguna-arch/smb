@@ -26,14 +26,18 @@ export const generateStudentReport = (req, res) => {
   res.setHeader("Content-Disposition", "inline; filename=student-report.pdf");
   doc.pipe(res);
 
-  // === Logo ===
-  doc.image("uploads/logo.png", 50, 30, { width: 60 });
+  // === Centered Logo ===
+  const pageWidth = doc.page.width;
+  const logoWidth = 80;
+  const logoX = (pageWidth - logoWidth) / 2;
+  doc.image("uploads/logo.png", logoX, 30, { width: logoWidth });
 
   // === School Name ===
+  doc.moveDown(3);
   doc.fontSize(24).text("GRATHER ACADEMY AND JUNIOR SECONDARY", { align: "center" });
   doc.moveDown();
 
-  // === Centered Exam Header ===
+  // === Exam Header ===
   doc.fontSize(18).text(`Exam Results - ${examType}`, { align: "center" });
   doc.moveDown();
 
@@ -56,10 +60,9 @@ export const generateStudentReport = (req, res) => {
   doc.text("Grade", colX.grade, tableTop);
   doc.text("Points", colX.points, tableTop);
 
-  // Header bottom line
   doc.moveTo(50, tableTop + 15).lineTo(550, tableTop + 15).stroke();
 
-  // === Table Rows with Grid ===
+  // === Table Rows ===
   let y = tableTop + 30;
   subjects.forEach((s) => {
     doc.text(s.name, colX.subject + 5, y);
@@ -67,23 +70,28 @@ export const generateStudentReport = (req, res) => {
     doc.text(s.grade, colX.grade + 5, y);
     doc.text(String(s.points), colX.points + 5, y);
 
-    // Horizontal line under row
     doc.moveTo(50, y + 15).lineTo(550, y + 15).stroke();
-
     y += 25;
   });
 
   // === Vertical column lines ===
   const tableBottom = y;
-  doc.moveTo(50, tableTop - 5).lineTo(50, tableBottom).stroke();   // Left border
-  doc.moveTo(190, tableTop - 5).lineTo(190, tableBottom).stroke(); // Subject col
-  doc.moveTo(290, tableTop - 5).lineTo(290, tableBottom).stroke(); // Marks col
-  doc.moveTo(390, tableTop - 5).lineTo(390, tableBottom).stroke(); // Grade col
-  doc.moveTo(550, tableTop - 5).lineTo(550, tableBottom).stroke(); // Right border
+  doc.moveTo(50, tableTop - 5).lineTo(50, tableBottom).stroke();
+  doc.moveTo(190, tableTop - 5).lineTo(190, tableBottom).stroke();
+  doc.moveTo(290, tableTop - 5).lineTo(290, tableBottom).stroke();
+  doc.moveTo(390, tableTop - 5).lineTo(390, tableBottom).stroke();
+  doc.moveTo(550, tableTop - 5).lineTo(550, tableBottom).stroke();
 
   // === Teacher Comment ===
   doc.moveDown();
-  doc.fontSize(14).text(`Teacher's Comment: ${comment}`);
+  doc.fontSize(14).text(`Teacher's Comment: ${comment}`, { align: "center" });
+
+  // === Footer Contact Info ===
+  doc.moveDown(3);
+  doc.fontSize(10).fillColor("gray").text(
+    "Grather Academy and Junior Secondary | P.O. Box 123, Nairobi, Kenya | Tel: +254 700 123456 | Email: info@gratheracademy.ac.ke",
+    { align: "center" }
+  );
 
   doc.end();
 };
