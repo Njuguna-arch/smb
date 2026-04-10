@@ -29,9 +29,11 @@ export const generateStudentReport = (req, res) => {
   // === Logo ===
   doc.image("uploads/logo.png", 50, 30, { width: 60 });
 
-  // === Centered Headers ===
-  doc.fontSize(22).text("Grather Academy", { align: "center" });
+  // === School Name ===
+  doc.fontSize(24).text("GRATHER ACADEMY AND JUNIOR SECONDARY", { align: "center" });
   doc.moveDown();
+
+  // === Centered Exam Header ===
   doc.fontSize(18).text(`Exam Results - ${examType}`, { align: "center" });
   doc.moveDown();
 
@@ -39,7 +41,7 @@ export const generateStudentReport = (req, res) => {
   doc.fontSize(14).text(`Student: ${name}`);
   doc.text(`Admission Number: ${admission}`);
   doc.text(`Overall Grade: ${grade}`);
-  doc.text(`Position: ${position}`); // 👈 Position now directly under grade
+  doc.text(`Position: ${position}`);
 
   // === Separator Line ===
   doc.moveTo(50, doc.y + 10).lineTo(550, doc.y + 10).stroke();
@@ -47,26 +49,37 @@ export const generateStudentReport = (req, res) => {
 
   // === Table Header ===
   const tableTop = doc.y;
-  doc.fontSize(12).text("Subject", 50, tableTop);
-  doc.text("Marks", 200, tableTop);
-  doc.text("Grade", 300, tableTop);
-  doc.text("Points", 400, tableTop);
+  const colX = { subject: 50, marks: 200, grade: 300, points: 400 };
 
+  doc.fontSize(12).text("Subject", colX.subject, tableTop);
+  doc.text("Marks", colX.marks, tableTop);
+  doc.text("Grade", colX.grade, tableTop);
+  doc.text("Points", colX.points, tableTop);
+
+  // Header bottom line
   doc.moveTo(50, tableTop + 15).lineTo(550, tableTop + 15).stroke();
 
-  // === Table Rows ===
+  // === Table Rows with Grid ===
   let y = tableTop + 30;
   subjects.forEach((s) => {
-    doc.text(s.name, 50, y);
-    doc.text(String(s.marks), 200, y);
-    doc.text(s.grade, 300, y);
-    doc.text(String(s.points), 400, y);
+    doc.text(s.name, colX.subject + 5, y);
+    doc.text(String(s.marks), colX.marks + 5, y);
+    doc.text(s.grade, colX.grade + 5, y);
+    doc.text(String(s.points), colX.points + 5, y);
 
-    // Row separator
+    // Horizontal line under row
     doc.moveTo(50, y + 15).lineTo(550, y + 15).stroke();
 
     y += 25;
   });
+
+  // === Vertical column lines ===
+  const tableBottom = y;
+  doc.moveTo(50, tableTop - 5).lineTo(50, tableBottom).stroke();   // Left border
+  doc.moveTo(190, tableTop - 5).lineTo(190, tableBottom).stroke(); // Subject col
+  doc.moveTo(290, tableTop - 5).lineTo(290, tableBottom).stroke(); // Marks col
+  doc.moveTo(390, tableTop - 5).lineTo(390, tableBottom).stroke(); // Grade col
+  doc.moveTo(550, tableTop - 5).lineTo(550, tableBottom).stroke(); // Right border
 
   // === Teacher Comment ===
   doc.moveDown();
