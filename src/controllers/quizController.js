@@ -41,7 +41,6 @@ export const getQuizzes = async (req, res) => {
 
 export const submitQuiz = async (req, res) => {
   const { answers } = req.body; 
-
   const studentId = req.user.id;
 
   try {
@@ -51,7 +50,11 @@ export const submitQuiz = async (req, res) => {
     for (const ans of answers) {
       const quizDoc = await Quiz.findById(ans.quizId);
       if (quizDoc) {
-        const isCorrect = quizDoc.correctAnswer === ans.selectedOption;
+        // normalize both sides to avoid case/space mismatches
+        const isCorrect =
+          quizDoc.correctAnswer?.trim().toLowerCase() ===
+          ans.selectedOption?.trim().toLowerCase();
+
         if (isCorrect) score++;
 
         detailedAnswers.push({
@@ -104,11 +107,7 @@ export const addQuiz = async (req, res) => {
   try {
     const { subject, grade, question, options, correctAnswer, type } = req.body;
 
-    let quizData = {
-      subject,
-      grade,
-      type,
-    };
+    let quizData = { subject, grade, type };
 
     const baseUrl = process.env.BASE_URL || "http://localhost:5000";
 
@@ -116,9 +115,15 @@ export const addQuiz = async (req, res) => {
       quizData.fileUrl = `${baseUrl}/uploads/quizzes/${req.file.filename}`;
     } else if (type === "mcq") {
       quizData.question = question;
-      quizData.options = Array.isArray(options)
-        ? options
-        : JSON.parse(options);
+      quizData.options = Array.isArray(options) ? options : JSON.parse(options);
+
+      // ensure correctAnswer matches one of the options
+      const normalizedOptions = quizData.options.map(opt => opt.trim().toLowerCase());
+      const normalizedCorrect = correctAnswer.trim().toLowerCase();
+      if (!normalizedOptions.includes(normalizedCorrect)) {
+        return res.status(400).json({ message: "Correct answer must match one of the options" });
+      }
+
       quizData.correctAnswer = correctAnswer;
     } else {
       return res.status(400).json({ message: "Invalid quiz type" });
@@ -143,12 +148,10 @@ export const downloadQuiz = async (req, res) => {
       return res.status(404).json({ message: "Quiz file not found" });
     }
 
-    // Resolve file path on server
     const filePath = path.resolve(
       `.${quiz.fileUrl.replace(/^.*\/uploads/, "uploads")}`
     );
 
-    // Force download instead of inline open
     res.download(filePath, path.basename(filePath), (err) => {
       if (err) {
         console.error("Error downloading quiz:", err);
