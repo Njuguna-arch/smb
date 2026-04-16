@@ -7,6 +7,7 @@ import {
   submitQuiz,
   getSubjects,
   addQuiz,
+  downloadQuiz, 
 } from "../controllers/quizController.js";
 import { authenticateToken } from "../middleware/authMiddleware.js";
 
@@ -26,18 +27,23 @@ const storage = multer.diskStorage({
 
 const upload = multer({ storage });
 
-// Routes
+// Get quizzes for student
 router.get("/", authenticateToken, getQuizzes);
 
+// Submit quiz answers
 router.post("/submit", authenticateToken, submitQuiz);
 
+// Get distinct subjects
 router.get("/subjects", authenticateToken, getSubjects);
 
+// Teacher uploads quiz
 router.post(
   "/",
   authenticateToken,
-  upload.single("quizFile"), // handles file upload
+  upload.single("quizFile"),
   addQuiz
 );
+
+router.get("/download/:quizId", authenticateToken, downloadQuiz);
 
 export default router;

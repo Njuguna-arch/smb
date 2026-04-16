@@ -26,32 +26,34 @@ export const generateStudentReport = (req, res) => {
   res.setHeader("Content-Disposition", "inline; filename=student-report.pdf");
   doc.pipe(res);
 
-  // === Centered Logo ===
+  // Centered Logo 
   const pageWidth = doc.page.width;
   const logoWidth = 80;
   const logoX = (pageWidth - logoWidth) / 2;
   doc.image("uploads/logo.png", logoX, 30, { width: logoWidth });
 
-  // === School Name ===
-  doc.moveDown(3);
+  doc.moveDown(5);
+
+  // School Name 
   doc.fontSize(24).text("GRATHER ACADEMY AND JUNIOR SECONDARY", { align: "center" });
   doc.moveDown();
 
-  // === Exam Header ===
+  //  Exam Header 
   doc.fontSize(18).text(`Exam Results - ${examType}`, { align: "center" });
   doc.moveDown();
 
-  // === Student Info Section ===
+
+  //  Student Info Section
   doc.fontSize(14).text(`Student: ${name}`);
   doc.text(`Admission Number: ${admission}`);
   doc.text(`Overall Grade: ${grade}`);
   doc.text(`Position: ${position}`);
 
-  // === Separator Line ===
+  // Separator Line
   doc.moveTo(50, doc.y + 10).lineTo(550, doc.y + 10).stroke();
   doc.moveDown();
 
-  // === Table Header ===
+  // Table Header
   const tableTop = doc.y;
   const colX = { subject: 50, marks: 200, grade: 300, points: 400 };
 
@@ -62,7 +64,7 @@ export const generateStudentReport = (req, res) => {
 
   doc.moveTo(50, tableTop + 15).lineTo(550, tableTop + 15).stroke();
 
-  // === Table Rows ===
+  // Table Rows
   let y = tableTop + 30;
   subjects.forEach((s) => {
     doc.text(s.name, colX.subject + 5, y);
@@ -74,7 +76,7 @@ export const generateStudentReport = (req, res) => {
     y += 25;
   });
 
-  // === Vertical column lines ===
+  // Vertical column lines
   const tableBottom = y;
   doc.moveTo(50, tableTop - 5).lineTo(50, tableBottom).stroke();
   doc.moveTo(190, tableTop - 5).lineTo(190, tableBottom).stroke();
@@ -82,11 +84,11 @@ export const generateStudentReport = (req, res) => {
   doc.moveTo(390, tableTop - 5).lineTo(390, tableBottom).stroke();
   doc.moveTo(550, tableTop - 5).lineTo(550, tableBottom).stroke();
 
-  // === Teacher Comment ===
+  //Teacher Comment
   doc.moveDown();
   doc.fontSize(14).text(`Teacher's Comment: ${comment}`, { align: "center" });
 
-  // === Footer Contact Info ===
+  // Footer Contact Info
   doc.moveDown(3);
   doc.fontSize(10).fillColor("gray").text(
     "Grather Academy and Junior Secondary | P.O. Box 123, Nairobi, Kenya | Tel: +254 700 123456 | Email: info@gratheracademy.ac.ke",

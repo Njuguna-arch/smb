@@ -1,3 +1,4 @@
+import path from "path";
 import Quiz from "../models/Quiz.js";
 import User from "../models/User.js";
 
@@ -100,7 +101,6 @@ export const addQuiz = async (req, res) => {
       type,
     };
 
-    // ✅ Use BASE_URL from .env for absolute file URLs
     const baseUrl = process.env.BASE_URL || "http://localhost:5000";
 
     if (type === "file" && req.file) {
@@ -109,7 +109,7 @@ export const addQuiz = async (req, res) => {
       quizData.question = question;
       quizData.options = Array.isArray(options)
         ? options
-        : JSON.parse(options); // handle JSON string from FormData
+        : JSON.parse(options);
       quizData.correctAnswer = correctAnswer;
     } else {
       return res.status(400).json({ message: "Invalid quiz type" });
@@ -121,6 +121,32 @@ export const addQuiz = async (req, res) => {
     res.status(201).json({ message: "Quiz added successfully", quiz });
   } catch (err) {
     console.error("Error adding quiz:", err.message);
+    res.status(500).json({ message: "Server error" });
+  }
+};
+
+//New: Download quiz
+export const downloadQuiz = async (req, res) => {
+  try {
+    const { quizId } = req.params;
+    const quiz = await Quiz.findById(quizId);
+
+    if (!quiz || !quiz.fileUrl) {
+      return res.status(404).json({ message: "Quiz file not found" });
+    }
+
+    // Resolve file path on server
+    const filePath = path.resolve(`.${quiz.fileUrl.replace(/^.*\/uploads/, "uploads")}`);
+
+    // Force download instead of inline open
+    res.download(filePath, path.basename(filePath), (err) => {
+      if (err) {
+        console.error("Error downloading quiz:", err);
+        res.status(500).json({ message: "Failed to download quiz" });
+      }
+    });
+  } catch (err) {
+    console.error("Error in downloadQuiz:", err.message);
     res.status(500).json({ message: "Server error" });
   }
 };
