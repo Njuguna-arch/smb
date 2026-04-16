@@ -47,43 +47,40 @@ export const submitQuiz = async (req, res) => {
     let score = 0;
     const detailedAnswers = [];
 
-    await Promise.all(
-      answers.map(async (ans) => {
-        const quizQuestion = await Quiz.findById(ans.questionId);
-        if (quizQuestion) {
-          const isCorrect = quizQuestion.correctAnswer === ans.selectedOption;
-          if (isCorrect) score++;
+    // Loop through all answers and build detailed results
+    for (const ans of answers) {
+      const questionDoc = await Quiz.findById(ans.questionId);
+      if (questionDoc) {
+        const isCorrect = questionDoc.correctAnswer === ans.selectedOption;
+        if (isCorrect) score++;
 
-          detailedAnswers.push({
-            questionId: ans.questionId,
-            question: quizQuestion.question,
-            selectedOption: ans.selectedOption,
-            correctAnswer: quizQuestion.correctAnswer,
-            isCorrect,
-          });
-        }
-      })
-    );
+        detailedAnswers.push({
+          questionId: ans.questionId,
+          question: questionDoc.question,
+          selectedOption: ans.selectedOption,
+          correctAnswer: questionDoc.correctAnswer,
+          isCorrect,
+        });
+      }
+    }
 
     const total = answers.length;
 
-    if (studentId && quizId) {
-      await User.findByIdAndUpdate(
-        studentId,
-        {
-          $push: {
-            completedQuizzes: {
-              quiz: quizId,
-              answers: detailedAnswers,
-              score,
-              total,
-              attemptedAt: new Date(),
-            },
+    await User.findByIdAndUpdate(
+      studentId,
+      {
+        $push: {
+          completedQuizzes: {
+            quiz: quizId,
+            answers: detailedAnswers,
+            score,
+            total,
+            attemptedAt: new Date(),
           },
         },
-        { new: true }
-      );
-    }
+      },
+      { new: true }
+    );
 
     res.json({ score, total, answers: detailedAnswers });
   } catch (err) {
