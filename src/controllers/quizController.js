@@ -29,7 +29,7 @@ export const getQuizzes = async (req, res) => {
     const quizzes = await Quiz.find(filter);
 
     if (!quizzes || quizzes.length === 0) {
-      return res.status(404).json({ message: "No quizzes found" });
+      return res.json([]);
     }
 
     res.json(quizzes);
@@ -45,12 +45,22 @@ export const submitQuiz = async (req, res) => {
 
   try {
     let score = 0;
+    const detailedAnswers = [];
 
     await Promise.all(
       answers.map(async (ans) => {
-        const quiz = await Quiz.findById(ans.questionId);
-        if (quiz && quiz.correctAnswer === ans.selectedOption) {
-          score++;
+        const quizQuestion = await Quiz.findById(ans.questionId);
+        if (quizQuestion) {
+          const isCorrect = quizQuestion.correctAnswer === ans.selectedOption;
+          if (isCorrect) score++;
+
+          detailedAnswers.push({
+            questionId: ans.questionId,
+            question: quizQuestion.question,
+            selectedOption: ans.selectedOption,
+            correctAnswer: quizQuestion.correctAnswer,
+            isCorrect,
+          });
         }
       })
     );
@@ -64,6 +74,7 @@ export const submitQuiz = async (req, res) => {
           $push: {
             completedQuizzes: {
               quiz: quizId,
+              answers: detailedAnswers,
               score,
               total,
               attemptedAt: new Date(),
@@ -74,7 +85,7 @@ export const submitQuiz = async (req, res) => {
       );
     }
 
-    res.json({ score, total });
+    res.json({ score, total, answers: detailedAnswers });
   } catch (err) {
     console.error("Error submitting quiz:", err.message);
     res.status(500).json({ message: "Server error" });
@@ -125,7 +136,6 @@ export const addQuiz = async (req, res) => {
   }
 };
 
-//New: Download quiz
 export const downloadQuiz = async (req, res) => {
   try {
     const { quizId } = req.params;
@@ -136,7 +146,9 @@ export const downloadQuiz = async (req, res) => {
     }
 
     // Resolve file path on server
-    const filePath = path.resolve(`.${quiz.fileUrl.replace(/^.*\/uploads/, "uploads")}`);
+    const filePath = path.resolve(
+      `.${quiz.fileUrl.replace(/^.*\/uploads/, "uploads")}`
+    );
 
     // Force download instead of inline open
     res.download(filePath, path.basename(filePath), (err) => {

@@ -1,9 +1,10 @@
 import express from "express";
 import User from "../models/User.js";
+import { authenticateToken } from "../middleware/authMiddleware.js";
 
 const router = express.Router();
 
-// Get all students (basic info)
+// Get all students
 router.get("/", async (req, res) => {
   try {
     const students = await User.find({ role: "student" }).select("name grade _id");
@@ -24,6 +25,19 @@ router.get("/:id", async (req, res) => {
     res.json(user);
   } catch (err) {
     console.error("Error fetching user:", err.message);
+    res.status(500).json({ message: "Server error" });
+  }
+});
+
+router.get("/:id/completed-quizzes", authenticateToken, async (req, res) => {
+  try {
+    const student = await User.findById(req.params.id).select("completedQuizzes");
+    if (!student) {
+      return res.status(404).json({ message: "Student not found" });
+    }
+    res.json(student.completedQuizzes);
+  } catch (err) {
+    console.error("Error fetching completed quizzes:", err.message);
     res.status(500).json({ message: "Server error" });
   }
 });
