@@ -40,23 +40,27 @@ export const getQuizzes = async (req, res) => {
 };
 
 export const submitQuiz = async (req, res) => {
-  const { quizId, answers } = req.body;
+  const { quizId, answers } = req.body;   // answers = [{ questionId, selectedOption }]
   const studentId = req.user.id;
 
   try {
+    const quiz = await Quiz.findById(quizId);
+    if (!quiz) {
+      return res.status(404).json({ message: "Quiz not found" });
+    }
+
     let score = 0;
     const detailedAnswers = [];
 
-    // Loop through all answers and build detailed results
     for (const ans of answers) {
-      const questionDoc = await Quiz.findById(ans.questionId);
+      const questionDoc = quiz.questions.id(ans.questionId);
       if (questionDoc) {
         const isCorrect = questionDoc.correctAnswer === ans.selectedOption;
         if (isCorrect) score++;
 
         detailedAnswers.push({
           questionId: ans.questionId,
-          question: questionDoc.question,
+          question: questionDoc.text,
           selectedOption: ans.selectedOption,
           correctAnswer: questionDoc.correctAnswer,
           isCorrect,
@@ -64,7 +68,7 @@ export const submitQuiz = async (req, res) => {
       }
     }
 
-    const total = answers.length;
+    const total = quiz.questions.length;
 
     await User.findByIdAndUpdate(
       studentId,
@@ -88,6 +92,7 @@ export const submitQuiz = async (req, res) => {
     res.status(500).json({ message: "Server error" });
   }
 };
+
 
 export const getSubjects = async (req, res) => {
   try {
