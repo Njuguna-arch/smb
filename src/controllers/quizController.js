@@ -40,42 +40,39 @@ export const getQuizzes = async (req, res) => {
 };
 
 export const submitQuiz = async (req, res) => {
-  const { quizId, answers } = req.body;   // answers = [{ questionId, selectedOption }]
+  const { answers } = req.body; 
+
   const studentId = req.user.id;
 
   try {
-    const quiz = await Quiz.findById(quizId);
-    if (!quiz) {
-      return res.status(404).json({ message: "Quiz not found" });
-    }
-
     let score = 0;
     const detailedAnswers = [];
 
     for (const ans of answers) {
-      const questionDoc = quiz.questions.id(ans.questionId);
-      if (questionDoc) {
-        const isCorrect = questionDoc.correctAnswer === ans.selectedOption;
+      const quizDoc = await Quiz.findById(ans.quizId);
+      if (quizDoc) {
+        const isCorrect = quizDoc.correctAnswer === ans.selectedOption;
         if (isCorrect) score++;
 
         detailedAnswers.push({
-          questionId: ans.questionId,
-          question: questionDoc.text,
+          quizId: ans.quizId,
+          subject: quizDoc.subject,
+          grade: quizDoc.grade,
+          question: quizDoc.question,
           selectedOption: ans.selectedOption,
-          correctAnswer: questionDoc.correctAnswer,
+          correctAnswer: quizDoc.correctAnswer,
           isCorrect,
         });
       }
     }
 
-    const total = quiz.questions.length;
+    const total = answers.length;
 
     await User.findByIdAndUpdate(
       studentId,
       {
         $push: {
           completedQuizzes: {
-            quiz: quizId,
             answers: detailedAnswers,
             score,
             total,
@@ -88,11 +85,10 @@ export const submitQuiz = async (req, res) => {
 
     res.json({ score, total, answers: detailedAnswers });
   } catch (err) {
-    console.error("Error submitting quiz:", err.message);
+    console.error("Error submitting quizzes:", err.message);
     res.status(500).json({ message: "Server error" });
   }
 };
-
 
 export const getSubjects = async (req, res) => {
   try {
