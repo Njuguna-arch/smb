@@ -40,7 +40,7 @@ export const getQuizzes = async (req, res) => {
 };
 
 export const submitQuiz = async (req, res) => {
-  const { answers } = req.body; 
+  const { answers } = req.body; // [{ quizId, selectedOption: "1" | "2" | "3" | "4" }]
   const studentId = req.user.id;
 
   try {
@@ -50,10 +50,14 @@ export const submitQuiz = async (req, res) => {
     for (const ans of answers) {
       const quizDoc = await Quiz.findById(ans.quizId);
       if (quizDoc) {
-        // normalize both sides to avoid case/space mismatches
+        // Convert index (1–4) to actual option text
+        const optionIndex = parseInt(ans.selectedOption, 10) - 1;
+        const selectedText = quizDoc.options[optionIndex];
+
+        // Normalize comparison
         const isCorrect =
-          quizDoc.correctAnswer?.trim().toLowerCase() ===
-          ans.selectedOption?.trim().toLowerCase();
+          selectedText?.trim().toLowerCase() ===
+          quizDoc.correctAnswer?.trim().toLowerCase();
 
         if (isCorrect) score++;
 
@@ -62,7 +66,7 @@ export const submitQuiz = async (req, res) => {
           subject: quizDoc.subject,
           grade: quizDoc.grade,
           question: quizDoc.question,
-          selectedOption: ans.selectedOption,
+          selectedOption: selectedText,      // ✅ store text for review
           correctAnswer: quizDoc.correctAnswer,
           isCorrect,
         });
