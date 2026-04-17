@@ -52,12 +52,16 @@ export const submitQuiz = async (req, res) => {
       if (quizDoc) {
         // Convert index (1–4) to actual option text
         const optionIndex = parseInt(ans.selectedOption, 10) - 1;
-        const selectedText = quizDoc.options[optionIndex];
+        const selectedText = quizDoc.options?.[optionIndex] || null;
 
-        // Normalize comparison
+        // Debug log to see what’s happening
+        console.log("Comparing:", selectedText, "vs", quizDoc.correctAnswer);
+
+        // Safe comparison
         const isCorrect =
-          selectedText?.trim().toLowerCase() ===
-          quizDoc.correctAnswer?.trim().toLowerCase();
+          selectedText &&
+          quizDoc.correctAnswer &&
+          selectedText.trim().toLowerCase() === quizDoc.correctAnswer.trim().toLowerCase();
 
         if (isCorrect) score++;
 
@@ -66,7 +70,7 @@ export const submitQuiz = async (req, res) => {
           subject: quizDoc.subject,
           grade: quizDoc.grade,
           question: quizDoc.question,
-          selectedOption: selectedText,      // ✅ store text for review
+          selectedOption: selectedText || ans.selectedOption, // fallback
           correctAnswer: quizDoc.correctAnswer,
           isCorrect,
         });
