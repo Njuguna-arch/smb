@@ -1,20 +1,18 @@
 import mongoose from "mongoose";
 
-const questionSchema = new mongoose.Schema({
-  text: { type: String, required: true }, 
-  options: [{ type: String, required: true }],
-  correctAnswer: { type: String, required: true } 
-});
-
 const quizSchema = new mongoose.Schema({
   subject: { type: String, required: true },
   grade: { type: String, required: true },
 
   type: { type: String, enum: ["mcq", "file"], required: true },
 
-  questions: [questionSchema],
+  question: { type: String },
+  options: [{ type: String }],
+  correctAnswer: { type: String },
 
-  fileUrl: { type: String }
+  fileUrl: { type: String },
+
+  createdAt: { type: Date, default: Date.now },
 });
 
 export default mongoose.model("Quiz", quizSchema);

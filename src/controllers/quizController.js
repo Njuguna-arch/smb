@@ -40,53 +40,37 @@ export const getQuizzes = async (req, res) => {
 };
 
 export const submitQuiz = async (req, res) => {
-  const { answers } = req.body; // [{ quizId, selectedOption: "1" | "2" | "3" | "4" }]
+  const { quizId, selectedOption } = req.body;   // one question at a time
   const studentId = req.user.id;
 
   try {
-    let score = 0;
-    const detailedAnswers = [];
-
-    for (const ans of answers) {
-      const quizDoc = await Quiz.findById(ans.quizId);
-      if (quizDoc) {
-        // Convert index (1–4) to actual option text
-        const optionIndex = parseInt(ans.selectedOption, 10) - 1;
-        const selectedText = quizDoc.options?.[optionIndex] || null;
-
-        // Debug log to see what’s happening
-        console.log("Comparing:", selectedText, "vs", quizDoc.correctAnswer);
-
-        // Safe comparison
-        const isCorrect =
-          selectedText &&
-          quizDoc.correctAnswer &&
-          selectedText.trim().toLowerCase() === quizDoc.correctAnswer.trim().toLowerCase();
-
-        if (isCorrect) score++;
-
-        detailedAnswers.push({
-          quizId: ans.quizId,
-          subject: quizDoc.subject,
-          grade: quizDoc.grade,
-          question: quizDoc.question,
-          selectedOption: selectedText || ans.selectedOption, // fallback
-          correctAnswer: quizDoc.correctAnswer,
-          isCorrect,
-        });
-      }
+    const quizDoc = await Quiz.findById(quizId);
+    if (!quizDoc) {
+      return res.status(404).json({ message: "Quiz not found" });
     }
 
-    const total = answers.length;
+    // Direct text comparison
+    const isCorrect = quizDoc.correctAnswer === selectedOption;
 
+    const detailedAnswer = {
+      quizId,
+      subject: quizDoc.subject,
+      grade: quizDoc.grade,
+      question: quizDoc.question,
+      selectedOption,
+      correctAnswer: quizDoc.correctAnswer,
+      isCorrect,
+    };
+
+    // Save permanently to completedQuizzes
     await User.findByIdAndUpdate(
       studentId,
       {
         $push: {
           completedQuizzes: {
-            answers: detailedAnswers,
-            score,
-            total,
+            answers: [detailedAnswer],
+            score: isCorrect ? 1 : 0,
+            total: 1,
             attemptedAt: new Date(),
           },
         },
@@ -94,9 +78,14 @@ export const submitQuiz = async (req, res) => {
       { new: true }
     );
 
-    res.json({ score, total, answers: detailedAnswers });
+    // Return immediate feedback
+    res.json({
+      score: isCorrect ? 1 : 0,
+      total: 1,
+      answers: [detailedAnswer],
+    });
   } catch (err) {
-    console.error("Error submitting quizzes:", err.message);
+    console.error("Error submitting quiz:", err.message);
     res.status(500).json({ message: "Server error" });
   }
 };
