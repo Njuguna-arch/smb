@@ -1,5 +1,3 @@
-import path from "path";
-import fs from "fs";
 import Quiz from "../models/Quiz.js";
 import User from "../models/User.js";
 
@@ -50,7 +48,6 @@ export const submitQuiz = async (req, res) => {
       return res.status(404).json({ message: "Quiz not found" });
     }
 
-    // Direct text comparison
     const isCorrect = quizDoc.correctAnswer === selectedOption;
 
     const detailedAnswer = {
@@ -63,7 +60,6 @@ export const submitQuiz = async (req, res) => {
       isCorrect,
     };
 
-    // Save permanently to completedQuizzes
     await User.findByIdAndUpdate(
       studentId,
       {
@@ -79,7 +75,6 @@ export const submitQuiz = async (req, res) => {
       { new: true }
     );
 
-    // Return immediate feedback
     res.json({
       score: isCorrect ? 1 : 0,
       total: 1,
@@ -107,15 +102,13 @@ export const addQuiz = async (req, res) => {
 
     let quizData = { subject, grade, type };
 
-    const baseUrl = process.env.BASE_URL || "http://localhost:5000";
-
     if (type === "file" && req.file) {
-      quizData.fileUrl = `${baseUrl}/uploads/quizzes/${req.file.filename}`;
+      // Cloudinary returns a secure URL in req.file.path
+      quizData.fileUrl = req.file.path;
     } else if (type === "mcq") {
       quizData.question = question;
       quizData.options = Array.isArray(options) ? options : JSON.parse(options);
 
-      // ensure correctAnswer matches one of the options
       const normalizedOptions = quizData.options.map(opt => opt.trim().toLowerCase());
       const normalizedCorrect = correctAnswer.trim().toLowerCase();
       if (!normalizedOptions.includes(normalizedCorrect)) {
@@ -146,20 +139,8 @@ export const downloadQuiz = async (req, res) => {
       return res.status(404).json({ message: "Quiz file not found" });
     }
 
-    // Extract relative path after /uploads/
-    const relativePath = quiz.fileUrl.split("/uploads/")[1];
-    const filePath = path.join(process.cwd(), "uploads", relativePath);
-
-    if (!fs.existsSync(filePath)) {
-      return res.status(404).json({ message: "File not found on server" });
-    }
-
-    res.download(filePath, path.basename(filePath), (err) => {
-      if (err) {
-        console.error("Error downloading quiz:", err);
-        res.status(500).json({ message: "Failed to download quiz" });
-      }
-    });
+    // Redirect student directly to Cloudinary file URL
+    return res.redirect(quiz.fileUrl);
   } catch (err) {
     console.error("Error in downloadQuiz:", err.message);
     res.status(500).json({ message: "Server error" });
