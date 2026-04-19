@@ -19,6 +19,7 @@ const storage = new CloudinaryStorage({
   params: {
     folder: "quizzes",              // Cloudinary folder
     resource_type: "raw",           // allows PDF/Word uploads
+    type: "upload",
     format: (req, file) => file.originalname.split(".").pop(), // keep extension
     public_id: (req, file) => Date.now() + "-" + file.originalname,
   },
