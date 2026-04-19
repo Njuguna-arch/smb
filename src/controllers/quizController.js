@@ -1,4 +1,5 @@
 import path from "path";
+import fs from "fs";
 import Quiz from "../models/Quiz.js";
 import User from "../models/User.js";
 
@@ -145,9 +146,13 @@ export const downloadQuiz = async (req, res) => {
       return res.status(404).json({ message: "Quiz file not found" });
     }
 
-    const filePath = path.resolve(
-      `.${quiz.fileUrl.replace(/^.*\/uploads/, "uploads")}`
-    );
+    // Extract relative path after /uploads/
+    const relativePath = quiz.fileUrl.split("/uploads/")[1];
+    const filePath = path.join(process.cwd(), "uploads", relativePath);
+
+    if (!fs.existsSync(filePath)) {
+      return res.status(404).json({ message: "File not found on server" });
+    }
 
     res.download(filePath, path.basename(filePath), (err) => {
       if (err) {
