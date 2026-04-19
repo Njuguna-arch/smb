@@ -1,6 +1,6 @@
 import express from "express";
 import multer from "multer";
-import multerStorageCloudinary from "multer-storage-cloudinary";
+import pkg from "multer-storage-cloudinary";   // default import
 import cloudinary from "../config/cloudinary.js";
 import {
   getQuizzes,
@@ -11,10 +11,9 @@ import {
 } from "../controllers/quizController.js";
 import { authenticateToken } from "../middleware/authMiddleware.js";
 
-const router = express.Router();
+const { CloudinaryStorage } = pkg;   // destructure from default export
 
-// Access CloudinaryStorage from the default export
-const CloudinaryStorage = multerStorageCloudinary.CloudinaryStorage;
+const router = express.Router();
 
 // Cloudinary storage setup
 const storage = new CloudinaryStorage({
