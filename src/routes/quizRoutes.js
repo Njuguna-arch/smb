@@ -11,19 +11,20 @@ import {
 } from "../controllers/quizController.js";
 import { authenticateToken } from "../middleware/authMiddleware.js";
 
-const { CloudinaryStorage } = multerStorageCloudinary;
-
 const router = express.Router();
+
+// Properly destructure CloudinaryStorage from the default export
+const CloudinaryStorage = multerStorageCloudinary.CloudinaryStorage;
 
 // Cloudinary storage setup
 const storage = new CloudinaryStorage({
   cloudinary,
   params: {
-    folder: "quizzes",
-    resource_type: "raw",
+    folder: "quizzes",              // Cloudinary folder
+    resource_type: "raw",           // allows PDF/Word uploads
     format: async (req, file) => {
       const ext = file.originalname.split(".").pop();
-      return ext;
+      return ext;                   // keep original extension
     },
     public_id: (req, file) => Date.now() + "-" + file.originalname,
   },
@@ -40,7 +41,7 @@ router.post("/submit", authenticateToken, submitQuiz);
 // Get distinct subjects
 router.get("/subjects", authenticateToken, getSubjects);
 
-// Teacher uploads quiz
+// Teacher uploads quiz (file or MCQ)
 router.post(
   "/",
   authenticateToken,
@@ -48,7 +49,7 @@ router.post(
   addQuiz
 );
 
-// Student downloads quiz
+// Student downloads quiz (redirects to Cloudinary URL)
 router.get("/download/:quizId", authenticateToken, downloadQuiz);
 
 export default router;
