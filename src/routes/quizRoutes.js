@@ -1,6 +1,6 @@
 import express from "express";
 import multer from "multer";
-import CloudinaryStorage from "../config/cloudinaryStorage.js";  // import the bridge
+import CloudinaryStorage from "../config/cloudinaryStorage.cjs";  // import the bridge
 import cloudinary from "../config/cloudinary.js";
 import {
   getQuizzes,
