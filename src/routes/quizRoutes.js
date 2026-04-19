@@ -11,7 +11,7 @@ import {
 } from "../controllers/quizController.js";
 import { authenticateToken } from "../middleware/authMiddleware.js";
 
-const { CloudinaryStorage } = pkg;   // destructure from default export
+const { CloudinaryStorage } = pkg;   // destructure CloudinaryStorage
 
 const router = express.Router();
 
