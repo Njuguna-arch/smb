@@ -1,4 +1,5 @@
-// Use CommonJS require to import from multer-storage-cloudinary
+// Use CommonJS require internally
 const { CloudinaryStorage } = require("multer-storage-cloudinary");
 
-module.exports = CloudinaryStorage;
+// Export it in a way ES modules can import cleanly
+export default CloudinaryStorage;
