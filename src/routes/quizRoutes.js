@@ -1,6 +1,6 @@
 import express from "express";
 import multer from "multer";
-import { CloudinaryStorage } from "multer-storage-cloudinary";
+import multerStorageCloudinary from "multer-storage-cloudinary";
 import cloudinary from "../config/cloudinary.js";
 import {
   getQuizzes,
@@ -10,6 +10,8 @@ import {
   downloadQuiz,
 } from "../controllers/quizController.js";
 import { authenticateToken } from "../middleware/authMiddleware.js";
+
+const { CloudinaryStorage } = multerStorageCloudinary;
 
 const router = express.Router();
 
@@ -21,7 +23,7 @@ const storage = new CloudinaryStorage({
     resource_type: "raw",
     format: async (req, file) => {
       const ext = file.originalname.split(".").pop();
-      return ext; 
+      return ext;
     },
     public_id: (req, file) => Date.now() + "-" + file.originalname,
   },
@@ -38,7 +40,7 @@ router.post("/submit", authenticateToken, submitQuiz);
 // Get distinct subjects
 router.get("/subjects", authenticateToken, getSubjects);
 
-// Teacher uploads quiz (file or MCQ)
+// Teacher uploads quiz
 router.post(
   "/",
   authenticateToken,
@@ -46,6 +48,7 @@ router.post(
   addQuiz
 );
 
+// Student downloads quiz
 router.get("/download/:quizId", authenticateToken, downloadQuiz);
 
 export default router;
