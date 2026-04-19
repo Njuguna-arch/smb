@@ -13,7 +13,7 @@ import { authenticateToken } from "../middleware/authMiddleware.js";
 
 const router = express.Router();
 
-// Properly destructure CloudinaryStorage from the default export
+// Access CloudinaryStorage from the default export
 const CloudinaryStorage = multerStorageCloudinary.CloudinaryStorage;
 
 // Cloudinary storage setup
@@ -22,10 +22,7 @@ const storage = new CloudinaryStorage({
   params: {
     folder: "quizzes",              // Cloudinary folder
     resource_type: "raw",           // allows PDF/Word uploads
-    format: async (req, file) => {
-      const ext = file.originalname.split(".").pop();
-      return ext;                   // keep original extension
-    },
+    format: (req, file) => file.originalname.split(".").pop(), // keep extension
     public_id: (req, file) => Date.now() + "-" + file.originalname,
   },
 });
