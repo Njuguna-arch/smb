@@ -26,7 +26,7 @@ connectDB();
 const app = express();
 
 // CORS setup
-const allowedOrigins = ["https://gratheracademy.netlify.app","liskanacademy.vercel.app", "http://localhost:3000", "https://gratheracademy.vercel.app" ];
+const allowedOrigins = ["https://gratheracademy.netlify.app", "https//:liskanacademy.vercel.app", "http://localhost:3000", "https://gratheracademy.vercel.app" ];
 
 app.use(
   cors({
