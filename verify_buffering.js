@@ -7,7 +7,7 @@ const verifyBuffering = async () => {
         const chunks = [];
         doc.on("data", (chunk) => chunks.push(chunk));
 
-        doc.fontSize(22).text("Grather Academy", { align: "center" });
+        doc.fontSize(22).text("Liskan Academy", { align: "center" });
         doc.moveDown();
         doc.end();
 

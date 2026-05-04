@@ -51,7 +51,6 @@ app.use(morgan("dev"));
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
-// IMPORTANT: point to ../uploads since server.js is inside src
 app.use(
   "/uploads",
   express.static(path.join(__dirname, "../uploads"), {

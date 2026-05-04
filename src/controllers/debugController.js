@@ -35,7 +35,7 @@ export const generateStudentReport = (req, res) => {
   doc.moveDown(5);
 
   // School Name 
-  doc.fontSize(24).text("GRATHER ACADEMY AND JUNIOR SECONDARY", { align: "center" });
+  doc.fontSize(24).text("LISKAN ACADEMY AND JUNIOR SECONDARY", { align: "center" });
   doc.moveDown();
 
   //  Exam Header 
@@ -60,7 +60,7 @@ export const generateStudentReport = (req, res) => {
   doc.fontSize(12).text("Subject", colX.subject, tableTop);
   doc.text("Marks", colX.marks, tableTop);
   doc.text("Grade", colX.grade, tableTop);
-  doc.text("Points", colX.points, tableTop);
+  doc.text("Lubrics", colX.points, tableTop);
 
   doc.moveTo(50, tableTop + 15).lineTo(550, tableTop + 15).stroke();
 
@@ -91,7 +91,7 @@ export const generateStudentReport = (req, res) => {
   // Footer Contact Info
   doc.moveDown(3);
   doc.fontSize(10).fillColor("gray").text(
-    "Grather Academy and Junior Secondary | P.O. Box 123, Nairobi, Kenya | Tel: +254 700 123456 | Email: info@gratheracademy.ac.ke",
+    "Liskan Academy and Junior Secondary | P.O. Box 123, Nairobi, Kenya | Tel: +254 700 123456 | Email: info@liskanacademy.ac.ke",
     { align: "center" }
   );
 
