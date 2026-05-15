@@ -40,7 +40,7 @@ export const updateStudentById = async (req, res) => {
         dateOfBirth,
         classTeacher,
       },
-      { new: true }
+      { returnDocument: "after" }
     );
 
     if (!updatedStudent) {

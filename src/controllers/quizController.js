@@ -39,7 +39,7 @@ export const getQuizzes = async (req, res) => {
 };
 
 export const submitQuiz = async (req, res) => {
-  const { quizId, selectedOption } = req.body;   // one question at a time
+  const { quizId, selectedOption } = req.body;
   const studentId = req.user.id;
 
   try {
@@ -72,7 +72,7 @@ export const submitQuiz = async (req, res) => {
           },
         },
       },
-      { new: true }
+      { returnDocument: "after" }
     );
 
     res.json({

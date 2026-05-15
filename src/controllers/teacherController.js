@@ -79,7 +79,7 @@ const getClassPerformance = async (req, res) => {
     if (term) matchStage.term = term;
     if (year) matchStage.year = Number(year);
 
-    console.log("🔍 Match stage:", matchStage);
+    console.log("Match stage:", matchStage);
 
     const subjectAverages = await ExamResult.aggregate([
       { $match: matchStage },
