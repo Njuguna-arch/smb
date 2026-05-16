@@ -81,72 +81,73 @@ const getClassPerformance = async (req, res) => {
 
     console.log("Match stage:", matchStage);
 
-    const subjectAverages = await ExamResult.aggregate([
-      { $match: matchStage },
-      { $unwind: "$subjectResults" },
-      {
-        $match: {
-          "subjectResults.subjectName": { $exists: true, $ne: "" },
-          "subjectResults.marks": { $exists: true, $ne: null },
-        },
+  const subjectAverages = await ExamResult.aggregate([
+    { $match: matchStage },
+    { $unwind: "$subjectResults" },
+    {
+      $match: {
+        "subjectResults.subject": { $exists: true, $ne: "" },
+        "subjectResults.score": { $exists: true, $ne: null },
       },
-      {
-        $project: {
-          subject: "$subjectResults.subjectName",
-          score: {
-            $convert: {
-              input: "$subjectResults.marks",
-              to: "double",
-              onError: 0,
-              onNull: 0,
-            },
+    },
+    {
+      $project: {
+        subject: "$subjectResults.subject",
+        score: {
+          $convert: {
+            input: "$subjectResults.score",
+            to: "double",
+            onError: 0,
+            onNull: 0,
           },
         },
       },
-      {
-        $group: {
-          _id: "$subject",
-          avgScore: { $avg: "$score" },
-        },
+    },
+    {
+      $group: {
+        _id: "$subject",
+        avgScore: { $avg: "$score" },
       },
-      {
-        $project: {
-          subject: "$_id",
-          average: "$avgScore",
-          _id: 0,
-        },
+    },
+    {
+      $project: {
+        subject: "$_id",
+        average: "$avgScore",
+        _id: 0,
       },
-    ]);
+    },
+  ]);
 
-    const overall = await ExamResult.aggregate([
-      { $match: matchStage },
-      { $unwind: "$subjectResults" },
-      {
-        $match: {
-          "subjectResults.subjectName": { $exists: true, $ne: "" },
-          "subjectResults.marks": { $exists: true, $ne: null },
-        },
+  const overall = await ExamResult.aggregate([
+    { $match: matchStage },
+    { $unwind: "$subjectResults" },
+    {
+      $match: {
+        "subjectResults.subject": { $exists: true, $ne: "" },
+        "subjectResults.score": { $exists: true, $ne: null },
       },
-      {
-        $project: {
-          score: {
-            $convert: {
-              input: "$subjectResults.marks",
-              to: "double",
-              onError: 0,
-              onNull: 0,
-            },
+    },
+    {
+      $project: {
+        score: {
+          $convert: {
+            input: "$subjectResults.score",
+            to: "double",
+            onError: 0,
+            onNull: 0,
           },
         },
       },
-      {
-        $group: {
-          _id: null,
-          totalScore: { $sum: "$score" },
-          meanScore: { $avg: "$score" },
-        },
+    },
+    {
+      $group: {
+        _id: null,
+        totalScore: { $sum: "$score" },
+        meanScore: { $avg: "$score" },
       },
-    ]);
+    },
+  ]);
+
 
     const totalScore = overall.length > 0 ? overall[0].totalScore : 0;
     const meanScore = overall.length > 0 ? overall[0].meanScore : 0;
