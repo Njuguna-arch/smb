@@ -65,6 +65,7 @@ export const submitQuiz = async (req, res) => {
       {
         $push: {
           completedQuizzes: {
+            quiz: quizId,   // <-- store quizId here
             answers: [detailedAnswer],
             score: isCorrect ? 1 : 0,
             total: 1,
@@ -76,6 +77,9 @@ export const submitQuiz = async (req, res) => {
     );
 
     res.json({
+      quiz: quizId,
+      subject: quizDoc.subject,
+      grade: quizDoc.grade,
       score: isCorrect ? 1 : 0,
       total: 1,
       answers: [detailedAnswer],
@@ -103,7 +107,6 @@ export const addQuiz = async (req, res) => {
     let quizData = { subject, grade, type };
 
     if (type === "file" && req.file) {
-      // Cloudinary returns a secure URL in req.file.path
       quizData.fileUrl = req.file.path;
     } else if (type === "mcq") {
       quizData.question = question;
@@ -139,7 +142,6 @@ export const downloadQuiz = async (req, res) => {
       return res.status(404).json({ message: "Quiz file not found" });
     }
 
-    // Redirect student directly to Cloudinary file URL
     return res.redirect(quiz.fileUrl);
   } catch (err) {
     console.error("Error in downloadQuiz:", err.message);

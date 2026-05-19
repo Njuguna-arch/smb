@@ -56,7 +56,18 @@ const userSchema = new mongoose.Schema(
 
     completedQuizzes: [
       {
-        quiz: { type: mongoose.Schema.Types.ObjectId, ref: "Quiz" },
+        quiz: { type: mongoose.Schema.Types.ObjectId, ref: "Quiz" }, // store quizId
+        answers: [
+          {
+            quizId: { type: mongoose.Schema.Types.ObjectId, ref: "Quiz" },
+            subject: String,
+            grade: String,
+            question: String,
+            selectedOption: String,
+            correctAnswer: String,
+            isCorrect: Boolean,
+          },
+        ],
         score: { type: Number },
         total: { type: Number },
         attemptedAt: { type: Date, default: Date.now },
