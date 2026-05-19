@@ -323,14 +323,14 @@ const getClassPerformance = async (req, res) => {
       return res.json({ performance: [], totalScore: 0, meanScore: 0 });
     }
 
-    // 🔹 Decide subject set based on class level
+    // 🔹 Fixed subject sets
     const primarySubjects = [
-      "Math", "English", "Science", "CRE",
-      "Social Studies", "Kiswahili", "Agriculture", "Creative Art"
+      "Math","English","Science","CRE",
+      "Social Studies","Kiswahili","Agriculture","Creative Art"
     ];
     const juniorSubjects = [
-      "Math", "English", "Science", "CRE",
-      "Social Studies", "Kiswahili", "Agriculture", "Creative Art", "Pre-Tech"
+      "Math","English","Science","CRE",
+      "Social Studies","Kiswahili","Agriculture","Creative Art","Pre-Tech"
     ];
 
     const subjects = ["Grade 1","Grade 2","Grade 3","Grade 4","Grade 5","Grade 6"].includes(className)
@@ -373,14 +373,14 @@ const getSchoolPerformance = async (req, res) => {
   try {
     const { examType, term, year } = req.query;
 
-    // Define subject sets
+    // 🔹 Fixed subject sets
     const primarySubjects = [
-      "Math", "English", "Science", "CRE",
-      "Social Studies", "Kiswahili", "Agriculture", "Creative Art"
+      "Math","English","Science","CRE",
+      "Social Studies","Kiswahili","Agriculture","Creative Art"
     ];
     const juniorSubjects = [
-      "Math", "English", "Science", "CRE",
-      "Social Studies", "Kiswahili", "Agriculture", "Creative Art", "Pre-Tech"
+      "Math","English","Science","CRE",
+      "Social Studies","Kiswahili","Agriculture","Creative Art","Pre-Tech"
     ];
 
     // Fetch results
@@ -394,7 +394,7 @@ const getSchoolPerformance = async (req, res) => {
       className: { $in: ["Grade 7","Grade 8","Grade 9"] }
     });
 
-    // Compute averages for a fixed subject list
+    // 🔹 Compute averages against fixed subject list
     const computePerformance = (results, subjects) => {
       if (!results || results.length === 0) {
         return { performance: subjects.map(s => ({ subject: s, average: 0 })), totalScore: 0, meanScore: 0 };
