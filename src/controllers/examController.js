@@ -315,16 +315,27 @@ const getAllUploadedExams = async (req, res) => {
 const getClassPerformance = async (req, res) => {
   try {
     const { examType, term, year } = req.query;
-    const results = await ExamResult.find({
-      examType,
-      term,
-      year,
-      className: req.user.classTeacher,
-    });
+    const className = req.user.classTeacher;
+
+    const results = await ExamResult.find({ examType, term, year, className });
 
     if (!results || results.length === 0) {
       return res.json({ performance: [], totalScore: 0, meanScore: 0 });
     }
+
+    // 🔹 Decide subject set based on class level
+    const primarySubjects = [
+      "Math", "English", "Science", "CRE",
+      "Social Studies", "Kiswahili", "Agriculture", "Creative Art"
+    ];
+    const juniorSubjects = [
+      "Math", "English", "Science", "CRE",
+      "Social Studies", "Kiswahili", "Agriculture", "Creative Art", "Pre-Tech"
+    ];
+
+    const subjects = ["Grade 1","Grade 2","Grade 3","Grade 4","Grade 5","Grade 6"].includes(className)
+      ? primarySubjects
+      : juniorSubjects;
 
     const subjectTotals = {};
     const subjectCounts = {};
@@ -333,22 +344,23 @@ const getClassPerformance = async (req, res) => {
 
     results.forEach((exam) => {
       exam.subjectResults.forEach((subj) => {
-        subjectTotals[subj.subjectName] =
-          (subjectTotals[subj.subjectName] || 0) + subj.marks;
-        subjectCounts[subj.subjectName] =
-          (subjectCounts[subj.subjectName] || 0) + 1;
-
-        totalScore += subj.marks;
-        totalMarksCount++;
+        if (subjects.includes(subj.subjectName)) {
+          subjectTotals[subj.subjectName] = (subjectTotals[subj.subjectName] || 0) + subj.marks;
+          subjectCounts[subj.subjectName] = (subjectCounts[subj.subjectName] || 0) + 1;
+          totalScore += subj.marks;
+          totalMarksCount++;
+        }
       });
     });
 
-    const performance = Object.keys(subjectTotals).map((subject) => ({
+    const performance = subjects.map((subject) => ({
       subject,
-      average: (subjectTotals[subject] / subjectCounts[subject]).toFixed(2),
+      average: subjectCounts[subject]
+        ? Number((subjectTotals[subject] / subjectCounts[subject]).toFixed(2))
+        : 0,
     }));
 
-    const meanScore = (totalScore / totalMarksCount).toFixed(2);
+    const meanScore = totalMarksCount > 0 ? Number((totalScore / totalMarksCount).toFixed(2)) : 0;
 
     res.json({ performance, totalScore, meanScore });
   } catch (err) {
@@ -356,24 +368,37 @@ const getClassPerformance = async (req, res) => {
     res.status(500).json({ message: "Server error" });
   }
 };
+
 const getSchoolPerformance = async (req, res) => {
   try {
     const { examType, term, year } = req.query;
 
-    // Primary (Grades 1–6)
+    // Define subject sets
+    const primarySubjects = [
+      "Math", "English", "Science", "CRE",
+      "Social Studies", "Kiswahili", "Agriculture", "Creative Art"
+    ];
+    const juniorSubjects = [
+      "Math", "English", "Science", "CRE",
+      "Social Studies", "Kiswahili", "Agriculture", "Creative Art", "Pre-Tech"
+    ];
+
+    // Fetch results
     const primaryResults = await ExamResult.find({
       examType, term, year,
       className: { $in: ["Grade 1","Grade 2","Grade 3","Grade 4","Grade 5","Grade 6"] }
     });
 
-    // Junior Secondary (Grades 7–9)
     const juniorResults = await ExamResult.find({
       examType, term, year,
       className: { $in: ["Grade 7","Grade 8","Grade 9"] }
     });
 
-    const computePerformance = (results) => {
-      if (!results || results.length === 0) return { performance: [], totalScore: 0, meanScore: 0 };
+    // Compute averages for a fixed subject list
+    const computePerformance = (results, subjects) => {
+      if (!results || results.length === 0) {
+        return { performance: subjects.map(s => ({ subject: s, average: 0 })), totalScore: 0, meanScore: 0 };
+      }
 
       const subjectTotals = {};
       const subjectCounts = {};
@@ -382,26 +407,30 @@ const getSchoolPerformance = async (req, res) => {
 
       results.forEach((exam) => {
         exam.subjectResults.forEach((subj) => {
-          subjectTotals[subj.subjectName] = (subjectTotals[subj.subjectName] || 0) + subj.marks;
-          subjectCounts[subj.subjectName] = (subjectCounts[subj.subjectName] || 0) + 1;
-          totalScore += subj.marks;
-          totalMarksCount++;
+          if (subjects.includes(subj.subjectName)) {
+            subjectTotals[subj.subjectName] = (subjectTotals[subj.subjectName] || 0) + subj.marks;
+            subjectCounts[subj.subjectName] = (subjectCounts[subj.subjectName] || 0) + 1;
+            totalScore += subj.marks;
+            totalMarksCount++;
+          }
         });
       });
 
-      const performance = Object.keys(subjectTotals).map((subject) => ({
+      const performance = subjects.map((subject) => ({
         subject,
-        average: Number((subjectTotals[subject] / subjectCounts[subject]).toFixed(2)),
+        average: subjectCounts[subject]
+          ? Number((subjectTotals[subject] / subjectCounts[subject]).toFixed(2))
+          : 0,
       }));
 
-      const meanScore = Number((totalScore / totalMarksCount).toFixed(2));
+      const meanScore = totalMarksCount > 0 ? Number((totalScore / totalMarksCount).toFixed(2)) : 0;
 
       return { performance, totalScore, meanScore };
     };
 
     res.json({
-      primary: computePerformance(primaryResults),
-      juniorSecondary: computePerformance(juniorResults),
+      primary: computePerformance(primaryResults, primarySubjects),
+      juniorSecondary: computePerformance(juniorResults, juniorSubjects),
     });
   } catch (err) {
     console.error("Error computing school performance:", err.message);
