@@ -187,6 +187,78 @@ const getStudentResults = async (req, res) => {
   }
 };
 
+// 🔹 Generate Exam Result PDF
+const getExamResultPDF = async (req, res) => {
+  const { admissionNumber, examType, term, year } = req.params;
+  try {
+    const exam = await ExamResult.findOne({ admissionNumber, examType, term, year })
+      .populate("studentId");
+
+    if (!exam) {
+      return res.status(404).json({ message: "Exam not found" });
+    }
+
+    // classmates for ranking
+    const classResults = await ExamResult.find({ examType, term, year, className: exam.className });
+    const ranked = classResults.map((r) => ({
+      admissionNumber: r.admissionNumber,
+      totalPoints: r.subjectResults.reduce((sum, subj) => sum + getPointsFromGrade(subj.grade), 0),
+    }));
+    ranked.sort((a, b) => b.totalPoints - a.totalPoints);
+
+    let position = "N/A";
+    ranked.forEach((r, idx) => {
+      if (r.admissionNumber === exam.admissionNumber) position = idx + 1;
+    });
+
+    // PDF response
+    res.setHeader("Content-Type", "application/pdf");
+    res.setHeader("Content-Disposition", `attachment; filename="${examType}-${term}-${year}.pdf"`);
+
+    const doc = new PDFDocument({ margin: 40 });
+    doc.pipe(res);
+
+    doc.fontSize(18).text(`Exam Results - ${examType} ${term} ${year}`, { align: "center" });
+    doc.moveDown();
+    doc.fontSize(12).text(`Student: ${exam.studentId?.name || "N/A"}`);
+    doc.text(`Admission Number: ${exam.admissionNumber}`);
+    doc.text(`Overall Grade: ${exam.overallGrade || "N/A"}`);
+    doc.text(`Position: ${position}`);
+    doc.moveDown();
+
+    exam.subjectResults.forEach((subj) => {
+      doc.text(`${subj.subjectName}: ${subj.marks} (${subj.grade})`);
+    });
+
+    doc.moveDown(2);
+    doc.text(`Teacher's Comment: ${exam.overallComment || "N/A"}`, { align: "center" });
+    doc.end();
+  } catch (err) {
+    console.error("Error generating PDF:", err);
+    res.status(500).json({ message: "Failed to generate PDF" });
+  }
+};
+
+// 🔹 Get All Uploaded Exams
+const getAllUploadedExams = async (req, res) => {
+  try {
+    const exams = await ExamResult.find({ className: req.user.classTeacher })
+      .sort({ createdAt: -1 })
+      .populate("uploadedBy", "name")
+      .populate("studentId", "name admissionNumber grade");
+
+    if (!exams || exams.length === 0) {
+      return res.json({ exams: [], message: "No exam results uploaded yet" });
+    }
+
+    res.json({ exams });
+  } catch (err) {
+    console.error("Error fetching uploaded exams:", err.message);
+    res.status(500).json({ message: "Server error" });
+  }
+};
+
+
 // 🔹 Teacher Class Performance
 const getClassPerformance = async (req, res) => {
   try {
@@ -309,6 +381,7 @@ export {
   uploadExamResults,
   getStudentResults,
   getExamResultPDF,
+  getAllUploadedExams,
   getClassPerformance,
   getSchoolPerformance,
 };
