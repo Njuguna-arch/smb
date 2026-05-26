@@ -7,16 +7,20 @@ import {
   createAnnouncement,
 } from "../controllers/adminController.js";
 import { getSchoolPerformance } from "../controllers/examController.js";
+import { authenticateToken } from "../middleware/authMiddleware.js";
 
 const router = express.Router();
 
-router.get("/performance", getSchoolPerformance);
+// 🔹 Admin-only school performance
+router.get("/performance", authenticateToken, getSchoolPerformance);
 
-router.get("/users", getUsers);
-router.post("/users", createUser);
-router.delete("/users/:id", deleteUser);
+// 🔹 Admin-only user management
+router.get("/users", authenticateToken, getUsers);
+router.post("/users", authenticateToken, createUser);
+router.delete("/users/:id", authenticateToken, deleteUser);
 
-router.get("/announcements", getAnnouncements);
-router.post("/announcements", createAnnouncement);
+// 🔹 Admin-only announcements
+router.get("/announcements", authenticateToken, getAnnouncements);
+router.post("/announcements", authenticateToken, createAnnouncement);
 
 export default router;

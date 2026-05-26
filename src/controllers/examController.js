@@ -39,6 +39,7 @@ const computeOverallGrade = (subjectResults) => {
   return getCBEGrade(avgMarks);
 };
 
+// 🔹 Upload Exam Results
 const uploadExamResults = async (req, res) => {
   try {
     if (!req.file) {
@@ -63,7 +64,7 @@ const uploadExamResults = async (req, res) => {
               if (!isNaN(marks)) {
                 const grade = getCBEGrade(marks);
                 subjectResults.push({
-                  subjectName: key,
+                  subjectName: key.trim(),
                   marks,
                   grade,
                   points: getPointsFromGrade(grade),
@@ -73,11 +74,11 @@ const uploadExamResults = async (req, res) => {
           });
 
           students.push({
-            admissionNumber: row.admissionNumber.trim(),
-            examType: row.examType.trim(),
+            admissionNumber: row.admissionNumber.trim().toUpperCase().replace(/^ADM/, ""),
+            examType: row.examType?.trim().toLowerCase(),
             subjectResults,
             overallComment: row.Comment?.trim() || "",
-            term: row.term?.trim() || "Term 1",
+            term: row.term?.trim().toLowerCase() || "term 1",
             year: row.year ? Number(row.year) : new Date().getFullYear(),
             uploadedBy: req.user?._id,
             sourceFile: req.file.originalname,
@@ -115,23 +116,18 @@ const uploadExamResults = async (req, res) => {
     await ExamResult.insertMany(toInsert);
 
     // After inserting, calculate positions
-    const { examType, term, year } = toInsert[0]; // assume all rows same exam
+    const { examType, term, year } = toInsert[0];
     const className = toInsert[0].className;
 
     const classResults = await ExamResult.find({ examType, term, year, className });
 
-    // Compute total points
     const ranked = classResults.map((r) => {
-      const totalPoints = r.subjectResults.reduce((sum, subj) => {
-        return sum + getPointsFromGrade(subj.grade);
-      }, 0);
+      const totalPoints = r.subjectResults.reduce((sum, subj) => sum + getPointsFromGrade(subj.grade), 0);
       return { id: r._id, admissionNumber: r.admissionNumber, totalPoints };
     });
 
-    // Sort descending
     ranked.sort((a, b) => b.totalPoints - a.totalPoints);
 
-    // Assign positions
     for (let i = 0; i < ranked.length; i++) {
       await ExamResult.findByIdAndUpdate(ranked[i].id, { position: i + 1 });
     }
@@ -146,18 +142,22 @@ const uploadExamResults = async (req, res) => {
   }
 };
 
+// 🔹 Student Results
 const getStudentResults = async (req, res) => {
   try {
-    const admissionNumber = req.params.admissionNumber;
+    const admissionNumber = req.params.admissionNumber.trim().toUpperCase().replace(/^ADM/, "");
 
-    // Fetch all results for this student
-    const results = await ExamResult.find({ admissionNumber }).sort({ createdAt: -1 });
+    const results = await ExamResult.find({
+      $or: [
+        { admissionNumber },
+        { studentId: req.user._id }
+      ]
+    }).sort({ createdAt: -1 });
 
     if (!results || results.length === 0) {
       return res.json([]);
     }
 
-    // For each exam, calculate position within the class
     for (const exam of results) {
       const classResults = await ExamResult.find({
         examType: exam.examType,
@@ -166,18 +166,13 @@ const getStudentResults = async (req, res) => {
         className: exam.className,
       });
 
-      // Compute total points for each student
       const ranked = classResults.map((r) => {
-        const totalPoints = r.subjectResults.reduce((sum, subj) => {
-          return sum + getPointsFromGrade(subj.grade);
-        }, 0);
+        const totalPoints = r.subjectResults.reduce((sum, subj) => sum + getPointsFromGrade(subj.grade), 0);
         return { admissionNumber: r.admissionNumber, totalPoints };
       });
 
-      // Sort descending
       ranked.sort((a, b) => b.totalPoints - a.totalPoints);
 
-      // Assign position
       ranked.forEach((r, idx) => {
         if (r.admissionNumber === exam.admissionNumber) {
           exam.position = idx + 1;
@@ -192,126 +187,7 @@ const getStudentResults = async (req, res) => {
   }
 };
 
-
-const getExamResultPDF = async (req, res) => {
-  const { admissionNumber, examType, term, year } = req.params;
-
-  try {
-    const exam = await ExamResult.findOne({ admissionNumber, examType, term, year })
-      .populate("studentId");
-
-    if (!exam) {
-      return res.status(404).json({ message: "Exam not found" });
-    }
-
-    // 🔹 Fetch all classmates for this exam
-    const classResults = await ExamResult.find({
-      examType,
-      term,
-      year,
-      className: exam.className,
-    });
-
-    // 🔹 Compute total points for each student
-    const ranked = classResults.map((r) => {
-      const totalPoints = r.subjectResults.reduce((sum, subj) => {
-        return sum + getPointsFromGrade(subj.grade);
-      }, 0);
-      return { admissionNumber: r.admissionNumber, totalPoints };
-    });
-
-    // 🔹 Sort descending
-    ranked.sort((a, b) => b.totalPoints - a.totalPoints);
-
-    // 🔹 Assign position
-    let position = "N/A";
-    ranked.forEach((r, idx) => {
-      if (r.admissionNumber === exam.admissionNumber) {
-        position = idx + 1;
-      }
-    });
-
-    // 🔹 Generate PDF
-    res.setHeader("Content-Type", "application/pdf");
-    res.setHeader(
-      "Content-Disposition",
-      `attachment; filename="${examType}-${term}-${year}.pdf"`
-    );
-
-    const doc = new PDFDocument({ margin: 40 });
-    doc.pipe(res);
-
-    doc.fontSize(18).text(`Exam Results - ${examType} ${term} ${year}`, { align: "center" });
-    doc.moveDown();
-    doc.fontSize(12).text(`Student: ${exam.studentId?.name || "N/A"}`);
-    doc.text(`Admission Number: ${exam.admissionNumber}`);
-    doc.text(`Overall Grade: ${exam.overallGrade || "N/A"}`);
-    doc.text(`Position: ${position}`); 
-    doc.moveDown();
-
-    const tableTop = doc.y;
-    const colWidths = [150, 100, 100, 100]; 
-
-    doc.font("Helvetica-Bold");
-    doc.text("Subject", 50, tableTop, { width: colWidths[0], align: "center" });
-    doc.text("Marks", 200, tableTop, { width: colWidths[1], align: "center" });
-    doc.text("Grade", 300, tableTop, { width: colWidths[2], align: "center" });
-    doc.text("Points", 400, tableTop, { width: colWidths[3], align: "center" });
-
-    doc.moveDown();
-    doc.font("Helvetica");
-
-    let rowY = tableTop + 20;
-    exam.subjectResults.forEach((subj) => {
-      const points = getPointsFromGrade(subj.grade);
-
-      doc.text(subj.subjectName, 50, rowY, { width: colWidths[0], align: "center" });
-      doc.text(subj.marks.toString(), 200, rowY, { width: colWidths[1], align: "center" });
-      doc.text(subj.grade, 300, rowY, { width: colWidths[2], align: "center" });
-      doc.text(points.toString(), 400, rowY, { width: colWidths[3], align: "center" });
-
-      rowY += 20;
-    });
-
-    doc.moveDown(2);
-
-    const pageWidth = doc.page.width;
-    const margin = doc.page.margins.left;
-
-    doc.font("Helvetica-Bold")
-       .text(`Teacher's Comment: ${exam.overallComment || "N/A"}`, margin, doc.y, {
-         width: pageWidth - margin * 2,
-         align: "center"
-       });
-
-    doc.end();
-
-  } catch (err) {
-    console.error("Error generating PDF:", err);
-    res.status(500).json({ message: "Failed to generate PDF" });
-  }
-};
-
-const getAllUploadedExams = async (req, res) => {
-  try {
-    console.log("Teacher:", req.user.name, "ClassTeacher:", req.user.classTeacher);
-
-    const exams = await ExamResult.find({ className: req.user.classTeacher })
-      .sort({ createdAt: -1 })
-      .populate("uploadedBy", "name")
-      .populate("studentId", "name admissionNumber grade");
-
-    if (!exams || exams.length === 0) {
-      return res.json({ exams: [], message: "No exam results uploaded yet" });
-    }
-
-    res.json({ exams });
-  } catch (err) {
-    console.error("Error fetching uploaded exams:", err.message);
-    res.status(500).json({ message: "Server error" });
-  }
-};
-
+// 🔹 Teacher Class Performance
 const getClassPerformance = async (req, res) => {
   try {
     const { examType, term, year } = req.query;
@@ -323,15 +199,8 @@ const getClassPerformance = async (req, res) => {
       return res.json({ performance: [], totalScore: 0, meanScore: 0 });
     }
 
-    // 🔹 Fixed subject sets
-    const primarySubjects = [
-      "Math","English","Science","CRE",
-      "Social Studies","Kiswahili","Agriculture","Creative Art"
-    ];
-    const juniorSubjects = [
-      "Math","English","Science","CRE",
-      "Social Studies","Kiswahili","Agriculture","Creative Art","Pre-Tech"
-    ];
+    const primarySubjects = ["Math","English","Science","CRE","Social Studies","Kiswahili","Agriculture","Creative Art"];
+    const juniorSubjects = ["Math","English","Science","CRE","Social Studies","Kiswahili","Agriculture","Creative Art","Pre-Tech"];
 
     const subjects = ["Grade 1","Grade 2","Grade 3","Grade 4","Grade 5","Grade 6"].includes(className)
       ? primarySubjects
@@ -373,7 +242,6 @@ const getSchoolPerformance = async (req, res) => {
   try {
     const { examType, term, year } = req.query;
 
-    // 🔹 Fixed subject sets
     const primarySubjects = [
       "Math","English","Science","CRE",
       "Social Studies","Kiswahili","Agriculture","Creative Art"
@@ -437,7 +305,6 @@ const getSchoolPerformance = async (req, res) => {
     res.status(500).json({ message: "Server error" });
   }
 };
-
 export {
   uploadExamResults,
   getStudentResults,
