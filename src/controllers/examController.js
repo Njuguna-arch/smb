@@ -308,8 +308,6 @@ const getSchoolPerformance = async (req, res) => {
 export {
   uploadExamResults,
   getStudentResults,
-  getExamResultPDF,
-  getAllUploadedExams,
   getClassPerformance,
   getSchoolPerformance,
 };
