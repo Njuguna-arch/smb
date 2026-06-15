@@ -142,10 +142,12 @@ const uploadExamResults = async (req, res) => {
   }
 };
 
-// 🔹 Student Results
 const getStudentResults = async (req, res) => {
   try {
-    const admissionNumber = req.params.admissionNumber.trim().toUpperCase().replace(/^ADM/, "");
+    const admissionNumber = req.params.admissionNumber
+      ?.trim()
+      .toUpperCase()
+      .replace(/^ADM/, "");
 
     const results = await ExamResult.find({
       $or: [
@@ -159,15 +161,21 @@ const getStudentResults = async (req, res) => {
     }
 
     for (const exam of results) {
+      const examType = exam.examType?.trim().toLowerCase();
+      const term = exam.term?.trim().toLowerCase();
+      const year = Number(exam.year);
+
       const classResults = await ExamResult.find({
-        examType: exam.examType,
-        term: exam.term,
-        year: exam.year,
+        examType,
+        term,
+        year,
         className: exam.className,
       });
 
       const ranked = classResults.map((r) => {
-        const totalPoints = r.subjectResults.reduce((sum, subj) => sum + getPointsFromGrade(subj.grade), 0);
+        const totalPoints = r.subjectResults.reduce(
+          (sum, subj) => sum + getPointsFromGrade(subj.grade), 0
+        );
         return { admissionNumber: r.admissionNumber, totalPoints };
       });
 
@@ -259,10 +267,12 @@ const getAllUploadedExams = async (req, res) => {
 };
 
 
-// 🔹 Teacher Class Performance
 const getClassPerformance = async (req, res) => {
   try {
-    const { examType, term, year } = req.query;
+    // Normalize query values
+    const examType = req.query.examType?.trim().toLowerCase();
+    const term = req.query.term?.trim().toLowerCase();
+    const year = Number(req.query.year);
     const className = req.user.classTeacher;
 
     const results = await ExamResult.find({ examType, term, year, className });
@@ -271,8 +281,14 @@ const getClassPerformance = async (req, res) => {
       return res.json({ performance: [], totalScore: 0, meanScore: 0 });
     }
 
-    const primarySubjects = ["Math","English","Science","CRE","Social Studies","Kiswahili","Agriculture","Creative Art"];
-    const juniorSubjects = ["Math","English","Science","CRE","Social Studies","Kiswahili","Agriculture","Creative Art","Pre-Tech"];
+    const primarySubjects = [
+      "Math","English","Science","CRE",
+      "Social Studies","Kiswahili","Agriculture","Creative Art"
+    ];
+    const juniorSubjects = [
+      "Math","English","Science","CRE",
+      "Social Studies","Kiswahili","Agriculture","Creative Art","Pre-Tech"
+    ];
 
     const subjects = ["Grade 1","Grade 2","Grade 3","Grade 4","Grade 5","Grade 6"].includes(className)
       ? primarySubjects
@@ -301,7 +317,9 @@ const getClassPerformance = async (req, res) => {
         : 0,
     }));
 
-    const meanScore = totalMarksCount > 0 ? Number((totalScore / totalMarksCount).toFixed(2)) : 0;
+    const meanScore = totalMarksCount > 0
+      ? Number((totalScore / totalMarksCount).toFixed(2))
+      : 0;
 
     res.json({ performance, totalScore, meanScore });
   } catch (err) {
@@ -312,7 +330,10 @@ const getClassPerformance = async (req, res) => {
 
 const getSchoolPerformance = async (req, res) => {
   try {
-    const { examType, term, year } = req.query;
+    // Normalize query values
+    const examType = req.query.examType?.trim().toLowerCase();
+    const term = req.query.term?.trim().toLowerCase();
+    const year = Number(req.query.year);
 
     const primarySubjects = [
       "Math","English","Science","CRE",
@@ -323,7 +344,7 @@ const getSchoolPerformance = async (req, res) => {
       "Social Studies","Kiswahili","Agriculture","Creative Art","Pre-Tech"
     ];
 
-    // Fetch results
+    // Fetch results by grade groups
     const primaryResults = await ExamResult.find({
       examType, term, year,
       className: { $in: ["Grade 1","Grade 2","Grade 3","Grade 4","Grade 5","Grade 6"] }
@@ -334,10 +355,14 @@ const getSchoolPerformance = async (req, res) => {
       className: { $in: ["Grade 7","Grade 8","Grade 9"] }
     });
 
-    // 🔹 Compute averages against fixed subject list
+    // Compute averages against fixed subject list
     const computePerformance = (results, subjects) => {
       if (!results || results.length === 0) {
-        return { performance: subjects.map(s => ({ subject: s, average: 0 })), totalScore: 0, meanScore: 0 };
+        return {
+          performance: subjects.map(s => ({ subject: s, average: 0 })),
+          totalScore: 0,
+          meanScore: 0
+        };
       }
 
       const subjectTotals = {};
@@ -363,7 +388,9 @@ const getSchoolPerformance = async (req, res) => {
           : 0,
       }));
 
-      const meanScore = totalMarksCount > 0 ? Number((totalScore / totalMarksCount).toFixed(2)) : 0;
+      const meanScore = totalMarksCount > 0
+        ? Number((totalScore / totalMarksCount).toFixed(2))
+        : 0;
 
       return { performance, totalScore, meanScore };
     };
