@@ -56,19 +56,19 @@ app.use(express.json());
 app.use(helmet());
 app.use(morgan("dev"));
 
-// Static uploads with CORP headers
+//Static uploads with CORP headers
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
 app.use(
   "/uploads",
+  cors(), // explicitly allow CORS for static files
   express.static(path.join(__dirname, "../uploads"), {
     setHeaders: (res) => {
       const origin = res.req.headers.origin;
-      if (allowedOrigins.includes(origin)) {
+      if (allowedOrigins.some((allowed) => origin.startsWith(origin))) {
         res.setHeader("Access-Control-Allow-Origin", origin);
       }
-      res.setHeader("Access-Control-Allow-Credentials", "true");
       res.setHeader("Cross-Origin-Resource-Policy", "cross-origin");
       res.setHeader("Cross-Origin-Embedder-Policy", "require-corp");
       res.setHeader("Cross-Origin-Opener-Policy", "same-origin");
@@ -76,7 +76,7 @@ app.use(
   })
 );
 
-// Routes
+//Routes
 app.use("/api/auth", authRoutes);
 app.use("/api/quizzes", quizRoutes);
 app.use("/api/exams", examRoutes);
@@ -89,12 +89,11 @@ app.use("/api/students", studentRoutes);
 app.use("/api/debug", debugRoutes);
 app.use("/api/admin/announcements", announcementRoutes);
 
-// Error handler
+//Error handler
 app.use((err, req, res, next) => {
   console.error("Server error:", err.stack);
   res.status(500).json({ message: "Server error" });
 });
 
-// Start server
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
