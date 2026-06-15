@@ -65,7 +65,7 @@ const uploadExamResults = async (req, res) => {
     }
 
     const results = [];
-    const stream = fs.createReadStream(req.file.path).pipe(csv());
+    const stream = fs.createReadStream(req.file.path).pipe(csvParser());
 
     stream.on("data", (row) => {
       const admissionNumber = row.admissionNumber?.trim().toUpperCase().replace(/^ADM/, "");
