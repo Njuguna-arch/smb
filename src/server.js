@@ -26,18 +26,27 @@ connectDB();
 const app = express();
 
 // CORS setup
-const allowedOrigins = ["https://gratheracademy.netlify.app", "https://liskanacademy.vercel.app", "http://localhost:3000", "https://gratheracademy.vercel.app" ];
+const allowedOrigins = [
+  "https://gratheracademy.netlify.app",
+  "https://liskanacademy.vercel.app",
+  "http://localhost:3000",
+  "https://gratheracademy.vercel.app"
+];
 
 app.use(
   cors({
     origin: (origin, callback) => {
-      if (!origin || allowedOrigins.includes(origin)) {
-        callback(null, true);
-      } else {
-        console.warn("Blocked by CORS:", origin);
-        callback(new Error("Not allowed by CORS"));
+      if (!origin) {
+        // Allow requests like Postman or curl without origin
+        return callback(null, true);
       }
+      if (allowedOrigins.some((allowed) => origin.startsWith(allowed))) {
+        return callback(null, true);
+      }
+      console.warn("Blocked by CORS:", origin);
+      return callback(new Error("Not allowed by CORS"));
     },
+    methods: ["GET", "POST", "PUT", "DELETE"],
     credentials: true,
   })
 );
