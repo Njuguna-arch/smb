@@ -39,105 +39,89 @@ const computeOverallGrade = (subjectResults) => {
   return getCBEGrade(avgMarks);
 };
 
-// 🔹 Upload Exam Results
+// 🔹 Helpers to normalize values to schema enums
+const normalizeExamType = (val) => {
+  switch (val?.trim().toLowerCase()) {
+    case "opener": return "Opener";
+    case "mid-term": return "Mid-Term";
+    case "end-term": return "End-Term";
+    default: return val; // fallback
+  }
+};
+
+const normalizeTerm = (val) => {
+  switch (val?.trim().toLowerCase()) {
+    case "term 1": return "Term 1";
+    case "term 2": return "Term 2";
+    case "term 3": return "Term 3";
+    default: return val; // fallback
+  }
+};
+
 const uploadExamResults = async (req, res) => {
   try {
     if (!req.file) {
-      return res.status(400).json({ message: "CSV file is required" });
+      return res.status(400).json({ message: "No file uploaded" });
     }
 
-    const students = [];
+    const results = [];
+    const stream = fs.createReadStream(req.file.path).pipe(csv());
 
-    await new Promise((resolve, reject) => {
-      fs.createReadStream(req.file.path)
-        .pipe(csvParser({ skipEmptyLines: true, mapHeaders: ({ header }) => header.trim() }))
-        .on("data", (row) => {
-          if (!row.admissionNumber || !row.examType) {
-            console.warn("Skipping invalid row:", row);
-            return;
-          }
+    stream.on("data", (row) => {
+      const admissionNumber = row.admissionNumber?.trim().toUpperCase().replace(/^ADM/, "");
+      const examType = normalizeExamType(row.examType);
+      const term = normalizeTerm(row.term);
+      const year = row.year && !isNaN(row.year) ? Number(row.year) : new Date().getFullYear();
 
-          const subjectResults = [];
-          Object.keys(row).forEach((key) => {
-            if (!["admissionNumber", "examType", "Comment", "term", "year"].includes(key)) {
-              const marks = Number(row[key]);
-              if (!isNaN(marks)) {
-                const grade = getCBEGrade(marks);
-                subjectResults.push({
-                  subjectName: key.trim(),
-                  marks,
-                  grade,
-                  points: getPointsFromGrade(grade),
-                });
-              }
-            }
-          });
+      const subjects = Object.keys(row).filter(
+        (key) => !["admissionNumber", "examType", "term", "year", "Comment"].includes(key)
+      );
 
-          students.push({
-            admissionNumber: row.admissionNumber.trim().toUpperCase().replace(/^ADM/, ""),
-            examType: row.examType?.trim().toLowerCase(),
-            subjectResults,
-            overallComment: row.Comment?.trim() || "",
-            term: row.term?.trim().toLowerCase() || "term 1",
-            year: row.year ? Number(row.year) : new Date().getFullYear(),
-            uploadedBy: req.user?._id,
-            sourceFile: req.file.originalname,
-          });
-        })
-        .on("end", resolve)
-        .on("error", reject);
-    });
+      const subjectResults = subjects.map((subject) => ({
+        subjectName: subject,
+        marks: Number(row[subject]) || 0,
+        grade: getGradeFromMarks(Number(row[subject]) || 0),
+      }));
 
-    const toInsert = [];
-    for (const s of students) {
-      const student = await User.findOne({ admissionNumber: s.admissionNumber });
-      if (!student) {
-        console.warn(`No student found for admissionNumber ${s.admissionNumber}`);
-        continue;
-      }
-
-      if (student.grade !== req.user.classTeacher) {
-        console.warn(`Teacher not authorized to upload for ${student.grade}`);
-        continue;
-      }
-
-      toInsert.push({
-        ...s,
-        studentId: student._id,
-        overallGrade: computeOverallGrade(s.subjectResults),
-        className: student.grade,
+      results.push({
+        admissionNumber,
+        examType,
+        term,
+        year,
+        subjectResults,
+        overallComment: row.Comment || "",
+        uploadedBy: req.user._id,
+        className: req.user.classTeacher,
       });
-    }
-
-    if (toInsert.length === 0) {
-      return res.status(400).json({ message: "No valid exam results to insert." });
-    }
-
-    await ExamResult.insertMany(toInsert);
-
-    // After inserting, calculate positions
-    const { examType, term, year } = toInsert[0];
-    const className = toInsert[0].className;
-
-    const classResults = await ExamResult.find({ examType, term, year, className });
-
-    const ranked = classResults.map((r) => {
-      const totalPoints = r.subjectResults.reduce((sum, subj) => sum + getPointsFromGrade(subj.grade), 0);
-      return { id: r._id, admissionNumber: r.admissionNumber, totalPoints };
     });
 
-    ranked.sort((a, b) => b.totalPoints - a.totalPoints);
+    stream.on("end", async () => {
+      const toInsert = [];
 
-    for (let i = 0; i < ranked.length; i++) {
-      await ExamResult.findByIdAndUpdate(ranked[i].id, { position: i + 1 });
-    }
+      for (const exam of results) {
+        const student = await User.findOne({ admissionNumber: exam.admissionNumber });
+        if (!student) {
+          console.warn(`No student found for admission ${exam.admissionNumber}`);
+          continue;
+        }
+        if (student.grade !== req.user.classTeacher) {
+          console.warn(`Teacher not authorized for ${student.grade}`);
+          continue;
+        }
 
-    res.json({
-      message: "Exam results uploaded successfully and positions calculated",
-      count: toInsert.length,
+        exam.studentId = student._id;
+        toInsert.push(exam);
+      }
+
+      if (toInsert.length === 0) {
+        return res.status(400).json({ message: "No valid exam results to insert" });
+      }
+
+      await ExamResult.insertMany(toInsert);
+      res.json({ message: "Exam results uploaded successfully", count: toInsert.length });
     });
   } catch (err) {
-    console.error("Error uploading exam results:", err);
+    console.error("Error uploading exam results:", err.message);
     res.status(500).json({ message: "Server error" });
   }
 };
