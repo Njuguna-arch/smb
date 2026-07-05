@@ -45,7 +45,7 @@ const normalizeExamType = (val) => {
     case "opener": return "Opener";
     case "mid-term": return "Mid-Term";
     case "end-term": return "End-Term";
-    default: return val; // fallback
+    default: return val;
   }
 };
 
@@ -54,10 +54,11 @@ const normalizeTerm = (val) => {
     case "term 1": return "Term 1";
     case "term 2": return "Term 2";
     case "term 3": return "Term 3";
-    default: return val; // fallback
+    default: return val;
   }
 };
 
+// 🔹 Upload Exam Results
 const uploadExamResults = async (req, res) => {
   try {
     if (!req.file) {
@@ -80,7 +81,7 @@ const uploadExamResults = async (req, res) => {
       const subjectResults = subjects.map((subject) => ({
         subjectName: subject,
         marks: Number(row[subject]) || 0,
-        grade: getGradeFromMarks(Number(row[subject]) || 0),
+        grade: getCBEGrade(Number(row[subject]) || 0),
       }));
 
       results.push({
@@ -89,6 +90,7 @@ const uploadExamResults = async (req, res) => {
         term,
         year,
         subjectResults,
+        overallGrade: computeOverallGrade(subjectResults),
         overallComment: row.Comment || "",
         uploadedBy: req.user._id,
         className: req.user.classTeacher,
@@ -128,16 +130,10 @@ const uploadExamResults = async (req, res) => {
 
 const getStudentResults = async (req, res) => {
   try {
-    const admissionNumber = req.params.admissionNumber
-      ?.trim()
-      .toUpperCase()
-      .replace(/^ADM/, "");
+    const admissionNumber = req.params.admissionNumber?.trim().toUpperCase().replace(/^ADM/, "");
 
     const results = await ExamResult.find({
-      $or: [
-        { admissionNumber },
-        { studentId: req.user._id }
-      ]
+      $or: [{ admissionNumber }, { studentId: req.user._id }]
     }).sort({ createdAt: -1 });
 
     if (!results || results.length === 0) {
@@ -145,16 +141,11 @@ const getStudentResults = async (req, res) => {
     }
 
     for (const exam of results) {
-      const examType = exam.examType?.trim().toLowerCase();
-      const term = exam.term?.trim().toLowerCase();
+      const examType = normalizeExamType(exam.examType);
+      const term = normalizeTerm(exam.term);
       const year = Number(exam.year);
 
-      const classResults = await ExamResult.find({
-        examType,
-        term,
-        year,
-        className: exam.className,
-      });
+      const classResults = await ExamResult.find({ examType, term, year, className: exam.className });
 
       const ranked = classResults.map((r) => {
         const totalPoints = r.subjectResults.reduce(
@@ -179,22 +170,36 @@ const getStudentResults = async (req, res) => {
   }
 };
 
-// 🔹 Generate Exam Result PDF
 const getExamResultPDF = async (req, res) => {
   const { admissionNumber, examType, term, year } = req.params;
   try {
-    const exam = await ExamResult.findOne({ admissionNumber, examType, term, year })
-      .populate("studentId");
+    const examTypeNorm = normalizeExamType(examType);
+    const termNorm = normalizeTerm(term);
+
+    const exam = await ExamResult.findOne({
+      admissionNumber,
+      examType: examTypeNorm,
+      term: termNorm,
+      year
+    }).populate("studentId");
 
     if (!exam) {
       return res.status(404).json({ message: "Exam not found" });
     }
 
     // classmates for ranking
-    const classResults = await ExamResult.find({ examType, term, year, className: exam.className });
+    const classResults = await ExamResult.find({
+      examType: examTypeNorm,
+      term: termNorm,
+      year,
+      className: exam.className
+    });
+
     const ranked = classResults.map((r) => ({
       admissionNumber: r.admissionNumber,
-      totalPoints: r.subjectResults.reduce((sum, subj) => sum + getPointsFromGrade(subj.grade), 0),
+      totalPoints: r.subjectResults.reduce(
+        (sum, subj) => sum + getPointsFromGrade(subj.grade), 0
+      ),
     }));
     ranked.sort((a, b) => b.totalPoints - a.totalPoints);
 
@@ -205,12 +210,12 @@ const getExamResultPDF = async (req, res) => {
 
     // PDF response
     res.setHeader("Content-Type", "application/pdf");
-    res.setHeader("Content-Disposition", `attachment; filename="${examType}-${term}-${year}.pdf"`);
+    res.setHeader("Content-Disposition", `attachment; filename="${examTypeNorm}-${termNorm}-${year}.pdf"`);
 
     const doc = new PDFDocument({ margin: 40 });
     doc.pipe(res);
 
-    doc.fontSize(18).text(`Exam Results - ${examType} ${term} ${year}`, { align: "center" });
+    doc.fontSize(18).text(`Exam Results - ${examTypeNorm} ${termNorm} ${year}`, { align: "center" });
     doc.moveDown();
     doc.fontSize(12).text(`Student: ${exam.studentId?.name || "N/A"}`);
     doc.text(`Admission Number: ${exam.admissionNumber}`);
@@ -230,6 +235,7 @@ const getExamResultPDF = async (req, res) => {
     res.status(500).json({ message: "Failed to generate PDF" });
   }
 };
+
 
 // 🔹 Get All Uploaded Exams
 const getAllUploadedExams = async (req, res) => {
@@ -253,9 +259,8 @@ const getAllUploadedExams = async (req, res) => {
 
 const getClassPerformance = async (req, res) => {
   try {
-    // Normalize query values
-    const examType = req.query.examType?.trim().toLowerCase();
-    const term = req.query.term?.trim().toLowerCase();
+    const examType = normalizeExamType(req.query.examType);
+    const term = normalizeTerm(req.query.term);
     const year = Number(req.query.year);
     const className = req.user.classTeacher;
 
@@ -314,9 +319,8 @@ const getClassPerformance = async (req, res) => {
 
 const getSchoolPerformance = async (req, res) => {
   try {
-    // Normalize query values
-    const examType = req.query.examType?.trim().toLowerCase();
-    const term = req.query.term?.trim().toLowerCase();
+    const examType = normalizeExamType(req.query.examType);
+    const term = normalizeTerm(req.query.term);
     const year = Number(req.query.year);
 
     const primarySubjects = [
@@ -328,7 +332,6 @@ const getSchoolPerformance = async (req, res) => {
       "Social Studies","Kiswahili","Agriculture","Creative Art","Pre-Tech"
     ];
 
-    // Fetch results by grade groups
     const primaryResults = await ExamResult.find({
       examType, term, year,
       className: { $in: ["Grade 1","Grade 2","Grade 3","Grade 4","Grade 5","Grade 6"] }
@@ -339,7 +342,6 @@ const getSchoolPerformance = async (req, res) => {
       className: { $in: ["Grade 7","Grade 8","Grade 9"] }
     });
 
-    // Compute averages against fixed subject list
     const computePerformance = (results, subjects) => {
       if (!results || results.length === 0) {
         return {
@@ -388,6 +390,7 @@ const getSchoolPerformance = async (req, res) => {
     res.status(500).json({ message: "Server error" });
   }
 };
+
 export {
   uploadExamResults,
   getStudentResults,
