@@ -11,7 +11,7 @@ const router = express.Router();
 
 // 🔹 Teacher-only exam upload
 router.post("/exam/csv", authenticateToken, (req, res, next) => {
-  if (req.user.role !== "teacher") {
+  if (!req.user.role || req.user.role.toLowerCase() !== "teacher") {
     return res.status(403).json({ message: "Forbidden: Only teachers can upload exams" });
   }
   next();
@@ -19,15 +19,15 @@ router.post("/exam/csv", authenticateToken, (req, res, next) => {
 
 // 🔹 Teacher-only discipline comments
 router.post("/discipline", authenticateToken, (req, res, next) => {
-  if (req.user.role !== "teacher") {
+  if (!req.user.role || req.user.role.toLowerCase() !== "teacher") {
     return res.status(403).json({ message: "Forbidden: Only teachers can add discipline comments" });
   }
   next();
 }, addDisciplineComment);
 
-// 🔹 Teacher-only class performance
+// 🔹 Teacher-only class performance (matches frontend `/api/teacher/performance`)
 router.get("/performance", authenticateToken, (req, res, next) => {
-  if (req.user.role !== "teacher") {
+  if (!req.user.role || req.user.role.toLowerCase() !== "teacher") {
     return res.status(403).json({ message: "Forbidden: Only teachers can view class performance" });
   }
   next();
