@@ -39,21 +39,30 @@ const computeOverallGrade = (subjectResults) => {
   return getCBEGrade(avgMarks);
 };
 
-// 🔹 Helpers to normalize values to schema enums
 const normalizeExamType = (val) => {
   switch (val?.trim().toLowerCase()) {
     case "opener": return "Opener";
-    case "mid-term": return "Mid-Term";
-    case "end-term": return "End-Term";
+    case "mid-term":
+    case "midterm":
+    case "mid term": return "Mid-Term";
+    case "end-term":
+    case "endterm":
+    case "end term": return "End-Term";
     default: return val;
   }
 };
 
 const normalizeTerm = (val) => {
   switch (val?.trim().toLowerCase()) {
-    case "term 1": return "Term 1";
-    case "term 2": return "Term 2";
-    case "term 3": return "Term 3";
+    case "term 1":
+    case "1st term":
+    case "term1": return "Term 1";
+    case "term 2":
+    case "2nd term":
+    case "term2": return "Term 2";
+    case "term 3":
+    case "3rd term":
+    case "term3": return "Term 3";
     default: return val;
   }
 };
