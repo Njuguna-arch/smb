@@ -275,7 +275,14 @@ const getClassPerformance = async (req, res) => {
 
     console.log("DEBUG: Query Params →", { examType, term, year, className });
 
-    const results = await ExamResult.find({ examType, term, year, className });
+    // ✅ Use regex for flexible matching (ignores case/spacing mismatches)
+    const results = await ExamResult.find({
+      examType: { $regex: new RegExp(examType, "i") },
+      term: { $regex: new RegExp(term, "i") },
+      year,
+      className: { $regex: new RegExp(className, "i") }
+    });
+
     console.log("DEBUG: Results Count →", results.length);
 
     if (!results || results.length === 0) {
@@ -295,20 +302,15 @@ const getClassPerformance = async (req, res) => {
     let totalMarksCount = 0;
 
     results.forEach((exam, examIndex) => {
-      console.log(`DEBUG: Exam #${examIndex} admissionNumber=${exam.admissionNumber}`);
-      exam.subjectResults.forEach((subj, subjIndex) => {
-        console.log(`   Subject #${subjIndex} →`, subj.subjectName, "Marks:", subj.marks, "Type:", typeof subj.marks);
+      exam.subjectResults.forEach((subj) => {
         const subject = subj.subjectName.trim();
-        subjectTotals[subject] = (subjectTotals[subject] || 0) + Number(subj.marks);
+        const marks = Number(subj.marks) || 0; // ✅ Ensure numeric
+        subjectTotals[subject] = (subjectTotals[subject] || 0) + marks;
         subjectCounts[subject] = (subjectCounts[subject] || 0) + 1;
-        totalScore += Number(subj.marks);
+        totalScore += marks;
         totalMarksCount++;
       });
     });
-
-    console.log("DEBUG: Subject Totals →", subjectTotals);
-    console.log("DEBUG: Subject Counts →", subjectCounts);
-    console.log("DEBUG: Total Score →", totalScore, "Total Marks Count →", totalMarksCount);
 
     const performance = subjects.map((subject) => ({
       subject,
@@ -317,13 +319,9 @@ const getClassPerformance = async (req, res) => {
         : 0,
     }));
 
-    console.log("DEBUG: Performance →", performance);
-
     const meanScore = totalMarksCount > 0
       ? Number((totalScore / totalMarksCount).toFixed(2))
       : 0;
-
-    console.log("DEBUG: Mean Score →", meanScore);
 
     res.json({ performance, totalScore, meanScore });
   } catch (err) {
@@ -331,7 +329,6 @@ const getClassPerformance = async (req, res) => {
     res.status(500).json({ message: "Server error" });
   }
 };
-
 
 const getSchoolPerformance = async (req, res) => {
   try {
