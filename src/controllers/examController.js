@@ -279,18 +279,10 @@ const getClassPerformance = async (req, res) => {
       return res.json({ performance: [], totalScore: 0, meanScore: 0 });
     }
 
-    const primarySubjects = [
-      "Math","English","Science","CRE",
-      "Social Studies","Kiswahili","Agriculture","Creative Art"
-    ];
-    const juniorSubjects = [
-      "Math","English","Science","CRE",
-      "Social Studies","Kiswahili","Agriculture","Creative Art","Pre-Tech"
-    ];
-
-    const subjects = ["Grade 1","Grade 2","Grade 3","Grade 4","Grade 5","Grade 6"].includes(className)
-      ? primarySubjects
-      : juniorSubjects;
+    // 🔹 Build subject list dynamically from stored results
+    const subjects = [...new Set(
+      results.flatMap(r => r.subjectResults.map(s => s.subjectName.trim()))
+    )];
 
     const subjectTotals = {};
     const subjectCounts = {};
@@ -299,9 +291,10 @@ const getClassPerformance = async (req, res) => {
 
     results.forEach((exam) => {
       exam.subjectResults.forEach((subj) => {
-        if (subjects.includes(subj.subjectName)) {
-          subjectTotals[subj.subjectName] = (subjectTotals[subj.subjectName] || 0) + subj.marks;
-          subjectCounts[subj.subjectName] = (subjectCounts[subj.subjectName] || 0) + 1;
+        const subject = subj.subjectName.trim();
+        if (subjects.includes(subject)) {
+          subjectTotals[subject] = (subjectTotals[subject] || 0) + subj.marks;
+          subjectCounts[subject] = (subjectCounts[subject] || 0) + 1;
           totalScore += subj.marks;
           totalMarksCount++;
         }
@@ -332,15 +325,7 @@ const getSchoolPerformance = async (req, res) => {
     const term = normalizeTerm(req.query.term);
     const year = Number(req.query.year);
 
-    const primarySubjects = [
-      "Math","English","Science","CRE",
-      "Social Studies","Kiswahili","Agriculture","Creative Art"
-    ];
-    const juniorSubjects = [
-      "Math","English","Science","CRE",
-      "Social Studies","Kiswahili","Agriculture","Creative Art","Pre-Tech"
-    ];
-
+    // 🔹 Fetch results separately for primary and junior
     const primaryResults = await ExamResult.find({
       examType, term, year,
       className: { $in: ["Grade 1","Grade 2","Grade 3","Grade 4","Grade 5","Grade 6"] }
@@ -351,14 +336,16 @@ const getSchoolPerformance = async (req, res) => {
       className: { $in: ["Grade 7","Grade 8","Grade 9"] }
     });
 
-    const computePerformance = (results, subjects) => {
+    // 🔹 Compute performance dynamically
+    const computePerformance = (results) => {
       if (!results || results.length === 0) {
-        return {
-          performance: subjects.map(s => ({ subject: s, average: 0 })),
-          totalScore: 0,
-          meanScore: 0
-        };
+        return { performance: [], totalScore: 0, meanScore: 0 };
       }
+
+      // Build subject list dynamically from stored results
+      const subjects = [...new Set(
+        results.flatMap(r => r.subjectResults.map(s => s.subjectName.trim()))
+      )];
 
       const subjectTotals = {};
       const subjectCounts = {};
@@ -367,12 +354,11 @@ const getSchoolPerformance = async (req, res) => {
 
       results.forEach((exam) => {
         exam.subjectResults.forEach((subj) => {
-          if (subjects.includes(subj.subjectName)) {
-            subjectTotals[subj.subjectName] = (subjectTotals[subj.subjectName] || 0) + subj.marks;
-            subjectCounts[subj.subjectName] = (subjectCounts[subj.subjectName] || 0) + 1;
-            totalScore += subj.marks;
-            totalMarksCount++;
-          }
+          const subject = subj.subjectName.trim();
+          subjectTotals[subject] = (subjectTotals[subject] || 0) + subj.marks;
+          subjectCounts[subject] = (subjectCounts[subject] || 0) + 1;
+          totalScore += subj.marks;
+          totalMarksCount++;
         });
       });
 
@@ -391,8 +377,8 @@ const getSchoolPerformance = async (req, res) => {
     };
 
     res.json({
-      primary: computePerformance(primaryResults, primarySubjects),
-      juniorSecondary: computePerformance(juniorResults, juniorSubjects),
+      primary: computePerformance(primaryResults),
+      juniorSecondary: computePerformance(juniorResults),
     });
   } catch (err) {
     console.error("Error computing school performance:", err.message);
