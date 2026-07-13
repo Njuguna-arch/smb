@@ -273,33 +273,42 @@ const getClassPerformance = async (req, res) => {
     const year = Number(req.query.year);
     const className = req.user.classTeacher;
 
+    console.log("DEBUG: Query Params →", { examType, term, year, className });
+
     const results = await ExamResult.find({ examType, term, year, className });
+    console.log("DEBUG: Results Count →", results.length);
 
     if (!results || results.length === 0) {
+      console.log("DEBUG: No results found");
       return res.json({ performance: [], totalScore: 0, meanScore: 0 });
     }
 
-    // 🔹 Build subject list dynamically from stored results
+    // Build subject list dynamically
     const subjects = [...new Set(
       results.flatMap(r => r.subjectResults.map(s => s.subjectName.trim()))
     )];
+    console.log("DEBUG: Subjects Found →", subjects);
 
     const subjectTotals = {};
     const subjectCounts = {};
     let totalScore = 0;
     let totalMarksCount = 0;
 
-    results.forEach((exam) => {
-      exam.subjectResults.forEach((subj) => {
+    results.forEach((exam, examIndex) => {
+      console.log(`DEBUG: Exam #${examIndex} admissionNumber=${exam.admissionNumber}`);
+      exam.subjectResults.forEach((subj, subjIndex) => {
+        console.log(`   Subject #${subjIndex} →`, subj.subjectName, "Marks:", subj.marks, "Type:", typeof subj.marks);
         const subject = subj.subjectName.trim();
-        if (subjects.includes(subject)) {
-          subjectTotals[subject] = (subjectTotals[subject] || 0) + subj.marks;
-          subjectCounts[subject] = (subjectCounts[subject] || 0) + 1;
-          totalScore += subj.marks;
-          totalMarksCount++;
-        }
+        subjectTotals[subject] = (subjectTotals[subject] || 0) + Number(subj.marks);
+        subjectCounts[subject] = (subjectCounts[subject] || 0) + 1;
+        totalScore += Number(subj.marks);
+        totalMarksCount++;
       });
     });
+
+    console.log("DEBUG: Subject Totals →", subjectTotals);
+    console.log("DEBUG: Subject Counts →", subjectCounts);
+    console.log("DEBUG: Total Score →", totalScore, "Total Marks Count →", totalMarksCount);
 
     const performance = subjects.map((subject) => ({
       subject,
@@ -308,9 +317,13 @@ const getClassPerformance = async (req, res) => {
         : 0,
     }));
 
+    console.log("DEBUG: Performance →", performance);
+
     const meanScore = totalMarksCount > 0
       ? Number((totalScore / totalMarksCount).toFixed(2))
       : 0;
+
+    console.log("DEBUG: Mean Score →", meanScore);
 
     res.json({ performance, totalScore, meanScore });
   } catch (err) {
@@ -319,48 +332,58 @@ const getClassPerformance = async (req, res) => {
   }
 };
 
+
 const getSchoolPerformance = async (req, res) => {
   try {
     const examType = normalizeExamType(req.query.examType);
     const term = normalizeTerm(req.query.term);
     const year = Number(req.query.year);
 
-    // 🔹 Fetch results separately for primary and junior
+    console.log("DEBUG: School Performance Query →", { examType, term, year });
+
     const primaryResults = await ExamResult.find({
       examType, term, year,
       className: { $in: ["Grade 1","Grade 2","Grade 3","Grade 4","Grade 5","Grade 6"] }
     });
+    console.log("DEBUG: Primary Results Count →", primaryResults.length);
 
     const juniorResults = await ExamResult.find({
       examType, term, year,
       className: { $in: ["Grade 7","Grade 8","Grade 9"] }
     });
+    console.log("DEBUG: Junior Results Count →", juniorResults.length);
 
-    // 🔹 Compute performance dynamically
-    const computePerformance = (results) => {
+    const computePerformance = (results, label) => {
       if (!results || results.length === 0) {
+        console.log(`DEBUG: No ${label} results found`);
         return { performance: [], totalScore: 0, meanScore: 0 };
       }
 
-      // Build subject list dynamically from stored results
       const subjects = [...new Set(
         results.flatMap(r => r.subjectResults.map(s => s.subjectName.trim()))
       )];
+      console.log(`DEBUG: ${label} Subjects Found →`, subjects);
 
       const subjectTotals = {};
       const subjectCounts = {};
       let totalScore = 0;
       let totalMarksCount = 0;
 
-      results.forEach((exam) => {
-        exam.subjectResults.forEach((subj) => {
+      results.forEach((exam, examIndex) => {
+        console.log(`DEBUG: ${label} Exam #${examIndex} admissionNumber=${exam.admissionNumber}`);
+        exam.subjectResults.forEach((subj, subjIndex) => {
+          console.log(`   Subject #${subjIndex} →`, subj.subjectName, "Marks:", subj.marks, "Type:", typeof subj.marks);
           const subject = subj.subjectName.trim();
-          subjectTotals[subject] = (subjectTotals[subject] || 0) + subj.marks;
+          subjectTotals[subject] = (subjectTotals[subject] || 0) + Number(subj.marks);
           subjectCounts[subject] = (subjectCounts[subject] || 0) + 1;
-          totalScore += subj.marks;
+          totalScore += Number(subj.marks);
           totalMarksCount++;
         });
       });
+
+      console.log(`DEBUG: ${label} Subject Totals →`, subjectTotals);
+      console.log(`DEBUG: ${label} Subject Counts →`, subjectCounts);
+      console.log(`DEBUG: ${label} Total Score →`, totalScore, "Total Marks Count →", totalMarksCount);
 
       const performance = subjects.map((subject) => ({
         subject,
@@ -369,16 +392,20 @@ const getSchoolPerformance = async (req, res) => {
           : 0,
       }));
 
+      console.log(`DEBUG: ${label} Performance →`, performance);
+
       const meanScore = totalMarksCount > 0
         ? Number((totalScore / totalMarksCount).toFixed(2))
         : 0;
+
+      console.log(`DEBUG: ${label} Mean Score →`, meanScore);
 
       return { performance, totalScore, meanScore };
     };
 
     res.json({
-      primary: computePerformance(primaryResults),
-      juniorSecondary: computePerformance(juniorResults),
+      primary: computePerformance(primaryResults, "Primary"),
+      juniorSecondary: computePerformance(juniorResults, "Junior"),
     });
   } catch (err) {
     console.error("Error computing school performance:", err.message);
