@@ -56,7 +56,7 @@ const userSchema = new mongoose.Schema(
 
     completedQuizzes: [
       {
-        quiz: { type: mongoose.Schema.Types.ObjectId, ref: "Quiz" }, // store quizId
+        quiz: { type: mongoose.Schema.Types.ObjectId, ref: "Quiz" },
         answers: [
           {
             quizId: { type: mongoose.Schema.Types.ObjectId, ref: "Quiz" },
@@ -78,9 +78,15 @@ const userSchema = new mongoose.Schema(
 );
 
 userSchema.pre("save", async function () {
-  if (!this.isModified("password")) return;
-  const salt = await bcrypt.genSalt(10);
-  this.password = await bcrypt.hash(this.password, salt);
+  if (this.isModified("admissionNumber") && this.role === "student") {
+    const clean = this.admissionNumber.trim().toUpperCase().replace(/^LA/, "");
+    this.admissionNumber = `LA${clean}`;
+  }
+
+  if (this.isModified("password")) {
+    const salt = await bcrypt.genSalt(10);
+    this.password = await bcrypt.hash(this.password, salt);
+  }
 });
 
 userSchema.methods.comparePassword = async function (candidatePassword) {

@@ -10,7 +10,10 @@ export const loginUser = async (req, res) => {
     let user;
 
     if (role === "student") {
-      const normalizedAdmission = admissionNumber?.trim().toUpperCase();
+      // 🔹 Normalize admission number to always have "LA" prefix
+      const clean = admissionNumber?.trim().toUpperCase().replace(/^LA/, "");
+      const normalizedAdmission = `LA${clean}`;
+
       user = await User.findOne({
         admissionNumber: normalizedAdmission,
         role: "student",

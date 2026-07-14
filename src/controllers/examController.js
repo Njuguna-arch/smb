@@ -77,34 +77,38 @@ const uploadExamResults = async (req, res) => {
     const results = [];
     const stream = fs.createReadStream(req.file.path).pipe(csvParser());
 
-    stream.on("data", (row) => {
-      const admissionNumber = row.admissionNumber?.trim().toUpperCase().replace(/^ADM/, "");
-      const examType = normalizeExamType(row.examType);
-      const term = normalizeTerm(row.term);
-      const year = row.year && !isNaN(row.year) ? Number(row.year) : new Date().getFullYear();
+stream.on("data", (row) => {
+  // 🔹 Normalize admission number to always have "LA" prefix
+  const raw = row.admissionNumber?.trim().toUpperCase();
+  const clean = raw.replace(/^LA/, "");
+  const admissionNumber = `LA${clean}`;
 
-      const subjects = Object.keys(row).filter(
-        (key) => !["admissionNumber", "examType", "term", "year", "Comment"].includes(key)
-      );
+  const examType = normalizeExamType(row.examType);
+  const term = normalizeTerm(row.term);
+  const year = row.year && !isNaN(row.year) ? Number(row.year) : new Date().getFullYear();
 
-      const subjectResults = subjects.map((subject) => ({
-        subjectName: subject,
-        marks: Number(row[subject]) || 0,
-        grade: getCBEGrade(Number(row[subject]) || 0),
-      }));
+  const subjects = Object.keys(row).filter(
+    (key) => !["admissionNumber", "examType", "term", "year", "Comment"].includes(key)
+  );
 
-      results.push({
-        admissionNumber,
-        examType,
-        term,
-        year,
-        subjectResults,
-        overallGrade: computeOverallGrade(subjectResults),
-        overallComment: row.Comment || "",
-        uploadedBy: req.user._id,
-        className: req.user.classTeacher,
-      });
-    });
+  const subjectResults = subjects.map((subject) => ({
+    subjectName: subject,
+    marks: Number(row[subject]) || 0,
+    grade: getCBEGrade(Number(row[subject]) || 0),
+  }));
+
+  results.push({
+    admissionNumber,
+    examType,
+    term,
+    year,
+    subjectResults,
+    overallGrade: computeOverallGrade(subjectResults),
+    overallComment: row.Comment || "",
+    uploadedBy: req.user._id,
+    className: req.user.classTeacher,
+  });
+});
 
     stream.on("end", async () => {
       const toInsert = [];
@@ -275,7 +279,7 @@ const getClassPerformance = async (req, res) => {
 
     console.log("DEBUG: Query Params →", { examType, term, year, className });
 
-    // ✅ Use regex for flexible matching (ignores case/spacing mismatches)
+    // Regex matching avoids empty results due to spacing/case differences
     const results = await ExamResult.find({
       examType: { $regex: new RegExp(examType, "i") },
       term: { $regex: new RegExp(term, "i") },
@@ -304,7 +308,7 @@ const getClassPerformance = async (req, res) => {
     results.forEach((exam, examIndex) => {
       exam.subjectResults.forEach((subj) => {
         const subject = subj.subjectName.trim();
-        const marks = Number(subj.marks) || 0; // ✅ Ensure numeric
+        const marks = Number(subj.marks) || 0; //Always numeric
         subjectTotals[subject] = (subjectTotals[subject] || 0) + marks;
         subjectCounts[subject] = (subjectCounts[subject] || 0) + 1;
         totalScore += marks;
@@ -323,7 +327,11 @@ const getClassPerformance = async (req, res) => {
       ? Number((totalScore / totalMarksCount).toFixed(2))
       : 0;
 
-    res.json({ performance, totalScore, meanScore });
+    console.log("DEBUG: Performance →", performance);
+    console.log("DEBUG: Mean Score →", meanScore);
+
+    // Echo filters back so frontend can confirm what backend matched
+    res.json({ filters: { examType, term, year, className }, performance, totalScore, meanScore });
   } catch (err) {
     console.error("Error computing class performance:", err.message);
     res.status(500).json({ message: "Server error" });
