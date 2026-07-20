@@ -65,104 +65,6 @@ const addDisciplineComment = async (req, res) => {
   }
 };
 
-const getClassPerformance = async (req, res) => {
-  try {
-    const teacherClass = req.user?.className || req.user?.grade;
-    if (!teacherClass) {
-      return res.status(403).json({ message: "No class assigned to this teacher" });
-    }
-
-    const { examType, term, year } = req.query;
-
-    const matchStage = { className: teacherClass };
-    if (examType) matchStage.examType = examType;
-    if (term) matchStage.term = term;
-    if (year) matchStage.year = Number(year);
-
-    console.log("Match stage:", matchStage);
-
-  const subjectAverages = await ExamResult.aggregate([
-    { $match: matchStage },
-    { $unwind: "$subjectResults" },
-    {
-      $match: {
-        "subjectResults.subject": { $exists: true, $ne: "" },
-        "subjectResults.score": { $exists: true, $ne: null },
-      },
-    },
-    {
-      $project: {
-        subject: "$subjectResults.subject",
-        score: {
-          $convert: {
-            input: "$subjectResults.score",
-            to: "double",
-            onError: 0,
-            onNull: 0,
-          },
-        },
-      },
-    },
-    {
-      $group: {
-        _id: "$subject",
-        avgScore: { $avg: "$score" },
-      },
-    },
-    {
-      $project: {
-        subject: "$_id",
-        average: "$avgScore",
-        _id: 0,
-      },
-    },
-  ]);
-
-  const overall = await ExamResult.aggregate([
-    { $match: matchStage },
-    { $unwind: "$subjectResults" },
-    {
-      $match: {
-        "subjectResults.subject": { $exists: true, $ne: "" },
-        "subjectResults.score": { $exists: true, $ne: null },
-      },
-    },
-    {
-      $project: {
-        score: {
-          $convert: {
-            input: "$subjectResults.score",
-            to: "double",
-            onError: 0,
-            onNull: 0,
-          },
-        },
-      },
-    },
-    {
-      $group: {
-        _id: null,
-        totalScore: { $sum: "$score" },
-        meanScore: { $avg: "$score" },
-      },
-    },
-  ]);
-
-
-    const totalScore = overall.length > 0 ? overall[0].totalScore : 0;
-    const meanScore = overall.length > 0 ? overall[0].meanScore : 0;
-
-    res.json({
-      performance: subjectAverages,
-      totalScore,
-      meanScore,
-    });
-  } catch (err) {
-    console.error("Error fetching class performance:", err.message);
-    res.status(500).json({ message: "Server error" });
-  }
-};
-
 const getStudentCompletedQuizzes = async (req, res) => {
   try {
     const { studentId } = req.params;
@@ -185,6 +87,5 @@ const getStudentCompletedQuizzes = async (req, res) => {
 export {
   uploadExamCSV,
   addDisciplineComment,
-  getClassPerformance,
   getStudentCompletedQuizzes,
 };

@@ -4,7 +4,6 @@ import csvParser from "csv-parser";
 import fs from "fs";
 import PDFDocument from "pdfkit";
 
-// 🔹 Helper: Map grade → points
 const getPointsFromGrade = (grade) => {
   switch (grade) {
     case "EE1": return 8;
@@ -67,7 +66,6 @@ const normalizeTerm = (val) => {
   }
 };
 
-// 🔹 Upload Exam Results
 const uploadExamResults = async (req, res) => {
   try {
     if (!req.file) {
@@ -250,7 +248,7 @@ const getExamResultPDF = async (req, res) => {
 };
 
 
-// 🔹 Get All Uploaded Exams
+//Get All Uploaded Exams
 const getAllUploadedExams = async (req, res) => {
   try {
     const exams = await ExamResult.find({ className: req.user.classTeacher })
@@ -272,20 +270,26 @@ const getAllUploadedExams = async (req, res) => {
 
 const getClassPerformance = async (req, res) => {
   try {
-    const examType = normalizeExamType(req.query.examType);
-    const term = normalizeTerm(req.query.term);
-    const year = Number(req.query.year);
     const className = req.user.classTeacher;
+    if (!className) {
+      return res.status(403).json({ message: "No class assigned to this teacher" });
+    }
 
-    console.log("DEBUG: Query Params →", { examType, term, year, className });
+    const query = { className: { $regex: new RegExp(`^${className}$`, "i") } };
 
-    // Regex matching avoids empty results due to spacing/case differences
-    const results = await ExamResult.find({
-      examType: { $regex: new RegExp(examType, "i") },
-      term: { $regex: new RegExp(term, "i") },
-      year,
-      className: { $regex: new RegExp(className, "i") }
-    });
+    if (req.query.examType) {
+      query.examType = { $regex: new RegExp(`^${normalizeExamType(req.query.examType)}$`, "i") };
+    }
+    if (req.query.term) {
+      query.term = { $regex: new RegExp(`^${normalizeTerm(req.query.term)}$`, "i") };
+    }
+    if (req.query.year) {
+      query.year = Number(req.query.year);
+    }
+
+    console.log("DEBUG: Class Performance Query →", query);
+
+    const results = await ExamResult.find(query);
 
     console.log("DEBUG: Results Count →", results.length);
 
@@ -294,7 +298,6 @@ const getClassPerformance = async (req, res) => {
       return res.json({ performance: [], totalScore: 0, meanScore: 0 });
     }
 
-    // Build subject list dynamically
     const subjects = [...new Set(
       results.flatMap(r => r.subjectResults.map(s => s.subjectName.trim()))
     )];
@@ -330,8 +333,7 @@ const getClassPerformance = async (req, res) => {
     console.log("DEBUG: Performance →", performance);
     console.log("DEBUG: Mean Score →", meanScore);
 
-    // Echo filters back so frontend can confirm what backend matched
-    res.json({ filters: { examType, term, year, className }, performance, totalScore, meanScore });
+    res.json({ filters: req.query, performance, totalScore, meanScore });
   } catch (err) {
     console.error("Error computing class performance:", err.message);
     res.status(500).json({ message: "Server error" });
@@ -340,21 +342,28 @@ const getClassPerformance = async (req, res) => {
 
 const getSchoolPerformance = async (req, res) => {
   try {
-    const examType = normalizeExamType(req.query.examType);
-    const term = normalizeTerm(req.query.term);
-    const year = Number(req.query.year);
+    const query = {};
+    if (req.query.examType) {
+      query.examType = { $regex: new RegExp(`^${normalizeExamType(req.query.examType)}$`, "i") };
+    }
+    if (req.query.term) {
+      query.term = { $regex: new RegExp(`^${normalizeTerm(req.query.term)}$`, "i") };
+    }
+    if (req.query.year) {
+      query.year = Number(req.query.year);
+    }
 
-    console.log("DEBUG: School Performance Query →", { examType, term, year });
+    console.log("DEBUG: School Performance Query →", query);
 
     const primaryResults = await ExamResult.find({
-      examType, term, year,
-      className: { $in: ["Grade 1","Grade 2","Grade 3","Grade 4","Grade 5","Grade 6"] }
+      ...query,
+      className: { $regex: /^(grade 1|grade 2|grade 3|grade 4|grade 5|grade 6)$/i }
     });
     console.log("DEBUG: Primary Results Count →", primaryResults.length);
 
     const juniorResults = await ExamResult.find({
-      examType, term, year,
-      className: { $in: ["Grade 7","Grade 8","Grade 9"] }
+      ...query,
+      className: { $regex: /^(grade 7|grade 8|grade 9)$/i }
     });
     console.log("DEBUG: Junior Results Count →", juniorResults.length);
 
@@ -375,20 +384,15 @@ const getSchoolPerformance = async (req, res) => {
       let totalMarksCount = 0;
 
       results.forEach((exam, examIndex) => {
-        console.log(`DEBUG: ${label} Exam #${examIndex} admissionNumber=${exam.admissionNumber}`);
-        exam.subjectResults.forEach((subj, subjIndex) => {
-          console.log(`   Subject #${subjIndex} →`, subj.subjectName, "Marks:", subj.marks, "Type:", typeof subj.marks);
+        exam.subjectResults.forEach((subj) => {
           const subject = subj.subjectName.trim();
-          subjectTotals[subject] = (subjectTotals[subject] || 0) + Number(subj.marks);
+          const marks = Number(subj.marks) || 0;
+          subjectTotals[subject] = (subjectTotals[subject] || 0) + marks;
           subjectCounts[subject] = (subjectCounts[subject] || 0) + 1;
-          totalScore += Number(subj.marks);
+          totalScore += marks;
           totalMarksCount++;
         });
       });
-
-      console.log(`DEBUG: ${label} Subject Totals →`, subjectTotals);
-      console.log(`DEBUG: ${label} Subject Counts →`, subjectCounts);
-      console.log(`DEBUG: ${label} Total Score →`, totalScore, "Total Marks Count →", totalMarksCount);
 
       const performance = subjects.map((subject) => ({
         subject,
@@ -397,14 +401,11 @@ const getSchoolPerformance = async (req, res) => {
           : 0,
       }));
 
-      console.log(`DEBUG: ${label} Performance →`, performance);
-
       const meanScore = totalMarksCount > 0
         ? Number((totalScore / totalMarksCount).toFixed(2))
         : 0;
 
-      console.log(`DEBUG: ${label} Mean Score →`, meanScore);
-
+      console.log(`DEBUG: ${label} Performance Computed`);
       return { performance, totalScore, meanScore };
     };
 
