@@ -156,7 +156,7 @@ export const downloadQuiz = async (req, res) => {
     publicId = decodeURIComponent(publicId);
 
     // Generate signed API URL that bypasses raw file restrictions and space encoding bugs
-    const signedUrl = cloudinary.utils.private_download_url(publicId, "raw", { attachment: true });
+    const signedUrl = cloudinary.utils.private_download_url(publicId, "", { resource_type: "raw", attachment: true });
 
     return res.json({ url: signedUrl });
   } catch (err) {
