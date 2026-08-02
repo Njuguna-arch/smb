@@ -1,5 +1,6 @@
 import Quiz from "../models/Quiz.js";
 import User from "../models/User.js";
+import cloudinary from "../config/cloudinary.js";
 
 export const getQuizzes = async (req, res) => {
   const { grade, subject } = req.query;
@@ -142,7 +143,22 @@ export const downloadQuiz = async (req, res) => {
       return res.status(404).json({ message: "Quiz file not found" });
     }
 
-    return res.redirect(quiz.fileUrl);
+    // Extract publicId from URL
+    const parts = quiz.fileUrl.split('/upload/');
+    if (parts.length < 2) {
+       return res.json({ url: quiz.fileUrl });
+    }
+    
+    let publicId = parts[1];
+    if (publicId.match(/^v\d+\//)) {
+      publicId = publicId.replace(/^v\d+\//, '');
+    }
+    publicId = decodeURIComponent(publicId);
+
+    // Generate signed URL that bypasses raw file restrictions
+    const signedUrl = cloudinary.url(publicId, { sign_url: true, resource_type: "raw" });
+
+    return res.json({ url: signedUrl });
   } catch (err) {
     console.error("Error in downloadQuiz:", err.message);
     res.status(500).json({ message: "Server error" });
