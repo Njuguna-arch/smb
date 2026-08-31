@@ -256,11 +256,14 @@ const getAllUploadedExams = async (req, res) => {
       .populate("uploadedBy", "name")
       .populate("studentId", "name admissionNumber grade");
 
-    if (!exams || exams.length === 0) {
+    // Filter out exams where the student's current grade does not match the teacher's class
+    const filteredExams = exams.filter(exam => exam.studentId && exam.studentId.grade === req.user.classTeacher);
+
+    if (!filteredExams || filteredExams.length === 0) {
       return res.json({ exams: [], message: "No exam results uploaded yet" });
     }
 
-    res.json({ exams });
+    res.json({ exams: filteredExams });
   } catch (err) {
     console.error("Error fetching uploaded exams:", err.message);
     res.status(500).json({ message: "Server error" });
@@ -289,7 +292,8 @@ const getClassPerformance = async (req, res) => {
 
     console.log("DEBUG: Class Performance Query →", query);
 
-    const results = await ExamResult.find(query);
+    const allResults = await ExamResult.find(query).populate("studentId", "grade");
+    const results = allResults.filter(r => r.studentId && r.studentId.grade === req.user.classTeacher);
 
     console.log("DEBUG: Results Count →", results.length);
 
