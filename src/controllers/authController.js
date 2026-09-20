@@ -18,7 +18,7 @@ export const loginUser = async (req, res) => {
 
       if (role === "student") {
         const clean = admissionNumber?.trim().toUpperCase().replace(/^LA/, "");
-        const normalizedAdmission = \LA\\;
+        const normalizedAdmission = admission.trim().toUpperCase();
 
         user = await User.findOne({
           admissionNumber: normalizedAdmission,
