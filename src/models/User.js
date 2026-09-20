@@ -1,4 +1,4 @@
-import mongoose from "mongoose";
+﻿import mongoose from "mongoose";
 import bcrypt from "bcrypt";
 
 const userSchema = new mongoose.Schema(
@@ -10,16 +10,16 @@ const userSchema = new mongoose.Schema(
       required: function () {
         return this.role === "student";
       },
-      unique: true,
       sparse: true,
-      index: true,
       trim: true,
     },
 
     email: {
       type: String,
-      required: true,
-      unique: true,
+      required: function () {
+        return this.role !== "student";
+      },
+      sparse: true, // changed from unique globally to compound below
       lowercase: true,
       trim: true,
     },
@@ -28,9 +28,17 @@ const userSchema = new mongoose.Schema(
 
     role: {
       type: String,
-      enum: ["student", "teacher", "admin"],
+      enum: ["student", "teacher", "admin", "superadmin"],
       required: true,
       lowercase: true,
+      trim: true,
+    },
+
+    schoolCode: {
+      type: String,
+      required: function () {
+        return this.role !== "superadmin";
+      },
       trim: true,
     },
 
@@ -77,10 +85,14 @@ const userSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
+// Compound indexes for multi-tenancy
+userSchema.index({ admissionNumber: 1, schoolCode: 1 }, { unique: true, sparse: true });
+userSchema.index({ email: 1, schoolCode: 1 }, { unique: true, sparse: true });
+
 userSchema.pre("save", async function () {
-  if (this.isModified("admissionNumber") && this.role === "student") {
+  if (this.isModified("admissionNumber") && this.role === "student" && this.admissionNumber) {
     const clean = this.admissionNumber.trim().toUpperCase().replace(/^LA/, "");
-    this.admissionNumber = `LA${clean}`;
+    this.admissionNumber = "LA" + clean;
   }
 
   if (this.isModified("password")) {
@@ -94,3 +106,4 @@ userSchema.methods.comparePassword = async function (candidatePassword) {
 };
 
 export default mongoose.model("User", userSchema);
+

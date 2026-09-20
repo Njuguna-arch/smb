@@ -4,7 +4,9 @@ import ExamResult from "../models/ExamResult.js";
 
 export const getPerformance = async (req, res) => {
   try {
+    const matchStage = req.user.role === "superadmin" ? {} : { schoolCode: req.user.schoolCode };
     const performance = await ExamResult.aggregate([
+      { $match: matchStage },
       { $group: { _id: "$subject", avgScore: { $avg: "$score" } } }
     ]);
     res.json(performance);
@@ -15,7 +17,8 @@ export const getPerformance = async (req, res) => {
 
 export const getUsers = async (req, res) => {
   try {
-    const users = await User.find();
+    const query = req.user.role === "superadmin" ? {} : { schoolCode: req.user.schoolCode };
+    const users = await User.find(query);
     res.json(users);
   } catch (err) {
     res.status(500).json({ message: "Failed to fetch users", error: err.message });
@@ -24,7 +27,11 @@ export const getUsers = async (req, res) => {
 
 export const createUser = async (req, res) => {
   try {
-    const user = new User(req.body);
+    const payload = { ...req.body };
+    if (req.user.role !== "superadmin") {
+      payload.schoolCode = req.user.schoolCode;
+    }
+    const user = new User(payload);
     await user.save();
     res.status(201).json(user);
   } catch (err) {
@@ -56,7 +63,8 @@ export const deleteUser = async (req, res) => {
 
 export const getAnnouncements = async (req, res) => {
   try {
-    const announcements = await Announcement.find().sort({ createdAt: -1 });
+    const query = req.user.role === "superadmin" ? {} : { schoolCode: req.user.schoolCode };
+    const announcements = await Announcement.find(query).sort({ createdAt: -1 });
     res.json(announcements);
   } catch (err) {
     res.status(500).json({ message: "Failed to fetch announcements", error: err.message });
@@ -68,6 +76,7 @@ export const createAnnouncement = async (req, res) => {
     const announcement = await Announcement.create({
       message: req.body.message,
       createdBy: req.user?.id,
+      schoolCode: req.user.schoolCode,
     });
     res.status(201).json(announcement);
   } catch (err) {
