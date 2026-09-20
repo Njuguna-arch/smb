@@ -1,4 +1,4 @@
-import Quiz from "../models/Quiz.js";
+﻿import Quiz from "../models/Quiz.js";
 import User from "../models/User.js";
 import cloudinary from "../config/cloudinary.js";
 
@@ -7,7 +7,7 @@ export const getQuizzes = async (req, res) => {
   const studentId = req.user.id;
 
   try {
-    const filter = {};
+    const filter = req.user.role === "superadmin" ? {} : { schoolCode: req.user.schoolCode };
 
     if (grade) {
       const match = grade.replace(/\+/g, " ").match(/\d+/);
@@ -105,7 +105,7 @@ export const addQuiz = async (req, res) => {
   try {
     const { subject, grade, question, options, correctAnswer, type } = req.body;
 
-    let quizData = { subject, grade, type };
+    let quizData = { subject, grade, type, schoolCode: req.user.schoolCode };
 
     if (type === "file" && req.file) {
       quizData.fileUrl = req.file.path;
@@ -164,3 +164,4 @@ export const downloadQuiz = async (req, res) => {
     res.status(500).json({ message: "Server error" });
   }
 };
+

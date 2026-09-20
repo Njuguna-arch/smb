@@ -1,4 +1,4 @@
-import jwt from "jsonwebtoken";
+﻿import jwt from "jsonwebtoken";
 import User from "../models/User.js";
 
 export const authenticateToken = async (req, res, next) => {
@@ -11,7 +11,6 @@ export const authenticateToken = async (req, res, next) => {
 
   try {
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
-
     const user = await User.findById(decoded.id);
     if (!user) {
       return res.status(404).json({ message: "User not found" });
@@ -23,6 +22,7 @@ export const authenticateToken = async (req, res, next) => {
       role: user.role,
       grade: user.grade,
       classTeacher: user.classTeacher,
+      schoolCode: user.schoolCode,
     };
 
     next();
@@ -39,13 +39,23 @@ export const authorizeRole = (...roles) => {
 
     const userRole = req.user.role.toLowerCase();
     const allowedRoles = roles.map((r) => r.toLowerCase());
+    
+    // Superadmin bypasses normal role checks
+    if (userRole === "superadmin") {
+      return next();
+    }
 
     if (!allowedRoles.includes(userRole)) {
-      return res
-        .status(403)
-        .json({ message: "Forbidden: insufficient role privileges" });
+      return res.status(403).json({ message: "Forbidden: insufficient role privileges" });
     }
 
     next();
   };
+};
+
+export const authorizeSuperAdmin = (req, res, next) => {
+  if (!req.user || req.user.role !== "superadmin") {
+    return res.status(403).json({ message: "Forbidden: Superadmin only" });
+  }
+  next();
 };

@@ -1,4 +1,4 @@
-import User from "../models/User.js";
+﻿import User from "../models/User.js";
 
 export const getStudentById = async (req, res) => {
   try {
@@ -69,3 +69,4 @@ export const getCompletedQuizzes = async (req, res) => {
     res.status(500).json({ message: "Server error" });
   }
 };
+

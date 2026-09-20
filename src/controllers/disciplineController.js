@@ -9,7 +9,11 @@ export const addDisciplineRecord = async (req, res) => {
       return res.status(400).json({ message: "Admission number and comment are required" });
     }
 
-    const student = await User.findOne({ admissionNumber, role: "student" });
+    const student = await User.findOne({ 
+      admissionNumber, 
+      role: "student",
+      schoolCode: req.user.schoolCode 
+    });
     if (!student) {
       return res.status(404).json({ message: "Student not found" });
     }
@@ -29,6 +33,7 @@ export const addDisciplineRecord = async (req, res) => {
       term: term || "Term 1",
       year: year || new Date().getFullYear(),
       resolved: false,
+      schoolCode: req.user.schoolCode,
     });
 
     return res.status(201).json({
@@ -48,12 +53,16 @@ export const getStudentDisciplineRecords = async (req, res) => {
   try {
     const { admissionNumber } = req.params;
 
-    const student = await User.findOne({ admissionNumber, role: "student" });
+    const student = await User.findOne({ 
+      admissionNumber, 
+      role: "student",
+      schoolCode: req.user.schoolCode 
+    });
     if (!student) {
       return res.status(404).json({ message: "Student not found" });
     }
 
-    const records = await Discipline.find({ admissionNumber });
+    const records = await Discipline.find({ admissionNumber, schoolCode: req.user.schoolCode });
     return res.status(200).json(records);
   } catch (err) {
     console.error("FULL ERROR TRACE:", err);
@@ -99,7 +108,8 @@ export const getAllDisciplineRecords = async (req, res) => {
       return res.status(403).json({ message: "Access denied" });
     }
 
-    const records = await Discipline.find().sort({ date: -1 });
+    const query = req.user.role === "superadmin" ? {} : { schoolCode: req.user.schoolCode };
+    const records = await Discipline.find(query).sort({ date: -1 });
     return res.status(200).json(records);
   } catch (err) {
     console.error("FULL ERROR TRACE:", err);
