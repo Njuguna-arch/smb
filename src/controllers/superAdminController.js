@@ -1,4 +1,4 @@
-﻿import School from "../models/School.js";
+import School from "../models/School.js";
 import User from "../models/User.js";
 
 export const getSchools = async (req, res) => {

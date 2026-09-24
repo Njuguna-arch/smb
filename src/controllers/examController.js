@@ -1,4 +1,4 @@
-﻿import ExamResult from "../models/ExamResult.js";
+import ExamResult from "../models/ExamResult.js";
 import User from "../models/User.js";
 import csvParser from "csv-parser";
 import fs from "fs";
@@ -97,7 +97,7 @@ stream.on("data", (row) => {
 
   results.push({
     admissionNumber,
-      schoolCode: req.user.schoolCode,
+      schoolCode,
     examType,
     term,
     year,
@@ -146,7 +146,7 @@ const getStudentResults = async (req, res) => {
     const admissionNumber = req.params.admissionNumber?.trim().toUpperCase().replace(/^ADM/, "");
 
     const results = await ExamResult.find({
-      schoolCode: req.user.schoolCode,
+      schoolCode,
       $or: [{ admissionNumber }, { studentId: req.user._id }]
     }).sort({ createdAt: -1 });
 
@@ -166,7 +166,7 @@ const getStudentResults = async (req, res) => {
           (sum, subj) => sum + getPointsFromGrade(subj.grade), 0
         );
         return { admissionNumber: r.admissionNumber,
-      schoolCode: req.user.schoolCode, totalPoints };
+      schoolCode, totalPoints };
       });
 
       ranked.sort((a, b) => b.totalPoints - a.totalPoints);
@@ -187,14 +187,14 @@ const getStudentResults = async (req, res) => {
 
 const getExamResultPDF = async (req, res) => {
   const { admissionNumber,
-      schoolCode: req.user.schoolCode, examType, term, year } = req.params;
+      schoolCode, examType, term, year } = req.params;
   try {
     const examTypeNorm = normalizeExamType(examType);
     const termNorm = normalizeTerm(term);
 
     const exam = await ExamResult.findOne({
       admissionNumber,
-      schoolCode: req.user.schoolCode,
+      schoolCode,
       examType: examTypeNorm,
       term: termNorm,
       year
@@ -214,7 +214,7 @@ const getExamResultPDF = async (req, res) => {
 
     const ranked = classResults.map((r) => ({
       admissionNumber: r.admissionNumber,
-      schoolCode: req.user.schoolCode,
+      schoolCode,
       totalPoints: r.subjectResults.reduce(
         (sum, subj) => sum + getPointsFromGrade(subj.grade), 0
       ),
@@ -285,294 +285,7 @@ const getClassPerformance = async (req, res) => {
       return res.status(403).json({ message: "No class assigned to this teacher" });
     }
 
-    const query = { className: { $regex: new RegExp(`^import ExamResult from "../models/ExamResult.js";
-import User from "../models/User.js";
-import csvParser from "csv-parser";
-import fs from "fs";
-import PDFDocument from "pdfkit";
-
-const getPointsFromGrade = (grade) => {
-  switch (grade) {
-    case "EE1": return 8;
-    case "EE2": return 7;
-    case "AE1": return 6;
-    case "AE2": return 5;
-    case "ME1": return 4;
-    case "ME2": return 3;
-    case "BE1": return 2;
-    case "BE2": return 1;
-    default: return 0;
-  }
-};
-
-// ðŸ”¹ Helper: Compute grade from marks
-const getCBEGrade = (marks) => {
-  if (marks >= 90) return "EE1";
-  if (marks >= 75) return "EE2";
-  if (marks >= 58) return "ME1";
-  if (marks >= 41) return "ME2";
-  if (marks >= 31) return "AE1";
-  if (marks >= 21) return "AE2";
-  if (marks >= 11) return "BE1";
-  return "BE2";
-};
-
-// ðŸ”¹ Helper: Compute overall grade from average marks
-const computeOverallGrade = (subjectResults) => {
-  if (!subjectResults || subjectResults.length === 0) return null;
-  const totalMarks = subjectResults.reduce((sum, subj) => sum + subj.marks, 0);
-  const avgMarks = totalMarks / subjectResults.length;
-  return getCBEGrade(avgMarks);
-};
-
-const normalizeExamType = (val) => {
-  switch (val?.trim().toLowerCase()) {
-    case "opener": return "Opener";
-    case "mid-term":
-    case "midterm":
-    case "mid term": return "Mid-Term";
-    case "end-term":
-    case "endterm":
-    case "end term": return "End-Term";
-    default: return val;
-  }
-};
-
-const normalizeTerm = (val) => {
-  switch (val?.trim().toLowerCase()) {
-    case "term 1":
-    case "1st term":
-    case "term1": return "Term 1";
-    case "term 2":
-    case "2nd term":
-    case "term2": return "Term 2";
-    case "term 3":
-    case "3rd term":
-    case "term3": return "Term 3";
-    default: return val;
-  }
-};
-
-const uploadExamResults = async (req, res) => {
-  try {
-    if (!req.file) {
-      return res.status(400).json({ message: "No file uploaded" });
-    }
-
-    const results = [];
-    const stream = fs.createReadStream(req.file.path).pipe(csvParser());
-
-stream.on("data", (row) => {
-  // ðŸ”¹ Normalize admission number to always have "LA" prefix
-  const raw = row.admissionNumber?.trim().toUpperCase();
-  const clean = raw.replace(/^LA/, "");
-  const admissionNumber = `LA${clean}`;
-
-  const examType = normalizeExamType(row.examType);
-  const term = normalizeTerm(row.term);
-  const year = row.year && !isNaN(row.year) ? Number(row.year) : new Date().getFullYear();
-
-  const subjects = Object.keys(row).filter(
-    (key) => !["admissionNumber", "examType", "term", "year", "Comment"].includes(key)
-  );
-
-  const subjectResults = subjects.map((subject) => ({
-    subjectName: subject,
-    marks: Number(row[subject]) || 0,
-    grade: getCBEGrade(Number(row[subject]) || 0),
-  }));
-
-  results.push({
-    admissionNumber,
-      schoolCode: req.user.schoolCode,
-    examType,
-    term,
-    year,
-    subjectResults,
-    overallGrade: computeOverallGrade(subjectResults),
-    overallComment: row.Comment || "",
-    uploadedBy: req.user._id,
-    className: req.user.classTeacher,
-  });
-});
-
-    stream.on("end", async () => {
-      const toInsert = [];
-
-      for (const exam of results) {
-        const student = await User.findOne({ admissionNumber: exam.admissionNumber });
-        if (!student) {
-          console.warn(`No student found for admission ${exam.admissionNumber}`);
-          continue;
-        }
-        if (student.grade !== req.user.classTeacher) {
-          console.warn(`Teacher not authorized for ${student.grade}`);
-          continue;
-        }
-
-        exam.studentId = student._id;
-        exam.schoolCode = req.user.schoolCode;
-        toInsert.push(exam);
-      }
-
-      if (toInsert.length === 0) {
-        return res.status(400).json({ message: "No valid exam results to insert" });
-      }
-
-      await ExamResult.insertMany(toInsert);
-      res.json({ message: "Exam results uploaded successfully", count: toInsert.length });
-    });
-  } catch (err) {
-    console.error("Error uploading exam results:", err.message);
-    res.status(500).json({ message: "Server error" });
-  }
-};
-
-const getStudentResults = async (req, res) => {
-  try {
-    const admissionNumber = req.params.admissionNumber?.trim().toUpperCase().replace(/^ADM/, "");
-
-    const results = await ExamResult.find({
-      schoolCode: req.user.schoolCode,
-      $or: [{ admissionNumber }, { studentId: req.user._id }]
-    }).sort({ createdAt: -1 });
-
-    if (!results || results.length === 0) {
-      return res.json([]);
-    }
-
-    for (const exam of results) {
-      const examType = normalizeExamType(exam.examType);
-      const term = normalizeTerm(exam.term);
-      const year = Number(exam.year);
-
-      const classResults = await ExamResult.find({ examType, term, year, className: exam.className, schoolCode: req.user.schoolCode });
-
-      const ranked = classResults.map((r) => {
-        const totalPoints = r.subjectResults.reduce(
-          (sum, subj) => sum + getPointsFromGrade(subj.grade), 0
-        );
-        return { admissionNumber: r.admissionNumber,
-      schoolCode: req.user.schoolCode, totalPoints };
-      });
-
-      ranked.sort((a, b) => b.totalPoints - a.totalPoints);
-
-      ranked.forEach((r, idx) => {
-        if (r.admissionNumber === exam.admissionNumber) {
-          exam.position = idx + 1;
-        }
-      });
-    }
-
-    res.json(results);
-  } catch (err) {
-    console.error("Error fetching student results:", err.message);
-    res.status(500).json({ message: "Server error" });
-  }
-};
-
-const getExamResultPDF = async (req, res) => {
-  const { admissionNumber,
-      schoolCode: req.user.schoolCode, examType, term, year } = req.params;
-  try {
-    const examTypeNorm = normalizeExamType(examType);
-    const termNorm = normalizeTerm(term);
-
-    const exam = await ExamResult.findOne({
-      admissionNumber,
-      schoolCode: req.user.schoolCode,
-      examType: examTypeNorm,
-      term: termNorm,
-      year
-    }).populate("studentId");
-
-    if (!exam) {
-      return res.status(404).json({ message: "Exam not found" });
-    }
-
-    // classmates for ranking
-    const classResults = await ExamResult.find({
-      examType: examTypeNorm,
-      term: termNorm,
-      year,
-      className: exam.className
-    });
-
-    const ranked = classResults.map((r) => ({
-      admissionNumber: r.admissionNumber,
-      schoolCode: req.user.schoolCode,
-      totalPoints: r.subjectResults.reduce(
-        (sum, subj) => sum + getPointsFromGrade(subj.grade), 0
-      ),
-    }));
-    ranked.sort((a, b) => b.totalPoints - a.totalPoints);
-
-    let position = "N/A";
-    ranked.forEach((r, idx) => {
-      if (r.admissionNumber === exam.admissionNumber) position = idx + 1;
-    });
-
-    // PDF response
-    res.setHeader("Content-Type", "application/pdf");
-    res.setHeader("Content-Disposition", `attachment; filename="${examTypeNorm}-${termNorm}-${year}.pdf"`);
-
-    const doc = new PDFDocument({ margin: 40 });
-    doc.pipe(res);
-
-    doc.fontSize(18).text(`Exam Results - ${examTypeNorm} ${termNorm} ${year}`, { align: "center" });
-    doc.moveDown();
-    doc.fontSize(12).text(`Student: ${exam.studentId?.name || "N/A"}`);
-    doc.text(`Admission Number: ${exam.admissionNumber}`);
-    doc.text(`Overall Grade: ${exam.overallGrade || "N/A"}`);
-    doc.text(`Position: ${position}`);
-    doc.moveDown();
-
-    exam.subjectResults.forEach((subj) => {
-      doc.text(`${subj.subjectName}: ${subj.marks} (${subj.grade})`);
-    });
-
-    doc.moveDown(2);
-    doc.text(`Teacher's Comment: ${exam.overallComment || "N/A"}`, { align: "center" });
-    doc.end();
-  } catch (err) {
-    console.error("Error generating PDF:", err);
-    res.status(500).json({ message: "Failed to generate PDF" });
-  }
-};
-
-
-//Get All Uploaded Exams
-const getAllUploadedExams = async (req, res) => {
-  try {
-    const exams = await ExamResult.find({ className: req.user.classTeacher, schoolCode: req.user.schoolCode })
-      .sort({ createdAt: -1 })
-      .populate("uploadedBy", "name")
-      .populate("studentId", "name admissionNumber grade");
-
-    // Filter out exams where the student's current grade does not match the teacher's class
-    const filteredExams = exams.filter(exam => exam.studentId && exam.studentId.grade === req.user.classTeacher);
-
-    if (!filteredExams || filteredExams.length === 0) {
-      return res.json({ exams: [], message: "No exam results uploaded yet" });
-    }
-
-    res.json({ exams: filteredExams });
-  } catch (err) {
-    console.error("Error fetching uploaded exams:", err.message);
-    res.status(500).json({ message: "Server error" });
-  }
-};
-
-
-const getClassPerformance = async (req, res) => {
-  try {
-    const className = req.user.classTeacher;
-    if (!className) {
-      return res.status(403).json({ message: "No class assigned to this teacher" });
-    }
-
-    , "i") }, schoolCode: req.user.schoolCode };
+    const query = { className: { $regex: new RegExp(`^${className}$`, "i") }, schoolCode: req.user.schoolCode };
 
     if (req.query.examType) {
       query.examType = { $regex: new RegExp(`^${normalizeExamType(req.query.examType)}$`, "i") };

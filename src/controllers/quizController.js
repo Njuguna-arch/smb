@@ -1,4 +1,4 @@
-﻿import Quiz from "../models/Quiz.js";
+import Quiz from "../models/Quiz.js";
 import User from "../models/User.js";
 import cloudinary from "../config/cloudinary.js";
 

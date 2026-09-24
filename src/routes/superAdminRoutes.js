@@ -1,4 +1,4 @@
-﻿import express from "express";
+import express from "express";
 import { getSchools, addSchool, removeSchool } from "../controllers/superAdminController.js";
 import { authenticateToken, authorizeSuperAdmin } from "../middleware/authMiddleware.js";
 

@@ -68,7 +68,7 @@ app.use(
   express.static(path.join(__dirname, "../uploads"), {
     setHeaders: (res) => {
       const origin = res.req.headers.origin;
-      if (allowedOrigins.some((allowed) => origin.startsWith(origin))) {
+      if (allowedOrigins.some((allowed) => origin.startsWith(allowed))) {
         res.setHeader("Access-Control-Allow-Origin", origin);
       }
       res.setHeader("Cross-Origin-Resource-Policy", "cross-origin");

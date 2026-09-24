@@ -1,4 +1,4 @@
-﻿import User from "../models/User.js";
+import User from "../models/User.js";
 import jwt from "jsonwebtoken";
 
 export const loginUser = async (req, res) => {
