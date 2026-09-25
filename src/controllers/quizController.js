@@ -1,13 +1,12 @@
 import Quiz from "../models/Quiz.js";
 import User from "../models/User.js";
-import cloudinary from "../config/cloudinary.js";
 
 export const getQuizzes = async (req, res) => {
   const { grade, subject } = req.query;
   const studentId = req.user.id;
 
   try {
-    const filter = req.user.role === "superadmin" ? {} : { schoolCode: req.user.schoolCode };
+    const filter = {};
 
     if (grade) {
       const match = grade.replace(/\+/g, " ").match(/\d+/);
@@ -29,7 +28,7 @@ export const getQuizzes = async (req, res) => {
     const quizzes = await Quiz.find(filter);
 
     if (!quizzes || quizzes.length === 0) {
-      return res.json([]);
+      return res.status(404).json({ message: "No quizzes found" });
     }
 
     res.json(quizzes);
@@ -40,51 +39,41 @@ export const getQuizzes = async (req, res) => {
 };
 
 export const submitQuiz = async (req, res) => {
-  const { quizId, selectedOption } = req.body;
+  const { quizId, answers } = req.body;
   const studentId = req.user.id;
 
   try {
-    const quizDoc = await Quiz.findById(quizId);
-    if (!quizDoc) {
-      return res.status(404).json({ message: "Quiz not found" });
-    }
+    let score = 0;
 
-    const isCorrect = quizDoc.correctAnswer === selectedOption;
-
-    const detailedAnswer = {
-      quizId,
-      subject: quizDoc.subject,
-      grade: quizDoc.grade,
-      question: quizDoc.question,
-      selectedOption,
-      correctAnswer: quizDoc.correctAnswer,
-      isCorrect,
-    };
-
-    await User.findByIdAndUpdate(
-      studentId,
-      {
-        $push: {
-          completedQuizzes: {
-            quiz: quizId,   // <-- store quizId here
-            answers: [detailedAnswer],
-            score: isCorrect ? 1 : 0,
-            total: 1,
-            attemptedAt: new Date(),
-          },
-        },
-      },
-      { returnDocument: "after" }
+    await Promise.all(
+      answers.map(async (ans) => {
+        const quiz = await Quiz.findById(ans.questionId);
+        if (quiz && quiz.correctAnswer === ans.selectedOption) {
+          score++;
+        }
+      })
     );
 
-    res.json({
-      quiz: quizId,
-      subject: quizDoc.subject,
-      grade: quizDoc.grade,
-      score: isCorrect ? 1 : 0,
-      total: 1,
-      answers: [detailedAnswer],
-    });
+    const total = answers.length;
+
+    if (studentId && quizId) {
+      await User.findByIdAndUpdate(
+        studentId,
+        {
+          $push: {
+            completedQuizzes: {
+              quiz: quizId,
+              score,
+              total,
+              attemptedAt: new Date(),
+            },
+          },
+        },
+        { new: true }
+      );
+    }
+
+    res.json({ score, total });
   } catch (err) {
     console.error("Error submitting quiz:", err.message);
     res.status(500).json({ message: "Server error" });
@@ -105,20 +94,22 @@ export const addQuiz = async (req, res) => {
   try {
     const { subject, grade, question, options, correctAnswer, type } = req.body;
 
-    let quizData = { subject, grade, type, schoolCode: req.user.schoolCode };
+    let quizData = {
+      subject,
+      grade,
+      type,
+    };
+
+    // ✅ Use BASE_URL from .env for absolute file URLs
+    const baseUrl = process.env.BASE_URL || "http://localhost:5000";
 
     if (type === "file" && req.file) {
-      quizData.fileUrl = req.file.path;
+      quizData.fileUrl = `${baseUrl}/uploads/quizzes/${req.file.filename}`;
     } else if (type === "mcq") {
       quizData.question = question;
-      quizData.options = Array.isArray(options) ? options : JSON.parse(options);
-
-      const normalizedOptions = quizData.options.map(opt => opt.trim().toLowerCase());
-      const normalizedCorrect = correctAnswer.trim().toLowerCase();
-      if (!normalizedOptions.includes(normalizedCorrect)) {
-        return res.status(400).json({ message: "Correct answer must match one of the options" });
-      }
-
+      quizData.options = Array.isArray(options)
+        ? options
+        : JSON.parse(options); // handle JSON string from FormData
       quizData.correctAnswer = correctAnswer;
     } else {
       return res.status(400).json({ message: "Invalid quiz type" });
@@ -133,35 +124,3 @@ export const addQuiz = async (req, res) => {
     res.status(500).json({ message: "Server error" });
   }
 };
-
-export const downloadQuiz = async (req, res) => {
-  try {
-    const { quizId } = req.params;
-    const quiz = await Quiz.findById(quizId);
-
-    if (!quiz || !quiz.fileUrl) {
-      return res.status(404).json({ message: "Quiz file not found" });
-    }
-
-    // Extract publicId from URL
-    const parts = quiz.fileUrl.split('/upload/');
-    if (parts.length < 2) {
-       return res.json({ url: quiz.fileUrl });
-    }
-    
-    let publicId = parts[1];
-    if (publicId.match(/^v\d+\//)) {
-      publicId = publicId.replace(/^v\d+\//, '');
-    }
-    publicId = decodeURIComponent(publicId);
-
-    // Generate signed API URL that bypasses raw file restrictions and space encoding bugs
-    const signedUrl = cloudinary.utils.private_download_url(publicId, "", { resource_type: "raw", type: "upload", attachment: true });
-
-    return res.json({ url: signedUrl });
-  } catch (err) {
-    console.error("Error in downloadQuiz:", err.message);
-    res.status(500).json({ message: "Server error" });
-  }
-};
-

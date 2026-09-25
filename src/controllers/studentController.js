@@ -40,7 +40,7 @@ export const updateStudentById = async (req, res) => {
         dateOfBirth,
         classTeacher,
       },
-      { returnDocument: "after" }
+      { new: true }
     );
 
     if (!updatedStudent) {
@@ -69,4 +69,3 @@ export const getCompletedQuizzes = async (req, res) => {
     res.status(500).json({ message: "Server error" });
   }
 };
-

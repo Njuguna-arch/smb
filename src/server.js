@@ -19,58 +19,42 @@ import userRoutes from "./routes/userRoutes.js";
 import studentRoutes from "./routes/studentRoutes.js";
 import debugRoutes from "./routes/debugRoutes.js";
 import announcementRoutes from "./routes/announcementRoutes.js";
-import messageRoutes from "./routes/messageRoutes.js";
-import superAdminRoutes from "./routes/superAdminRoutes.js";
 
 dotenv.config();
 connectDB();
 
 const app = express();
 
-// CORS setup
-const allowedOrigins = [
-  "https://gratheracademy.netlify.app",
-  "https://liskanacademy.vercel.app",
-  "http://localhost:3000",
-  "https://gratheracademy.vercel.app"
-];
-
-app.use(
-  cors({
-    origin: (origin, callback) => {
-      if (!origin) {
-        // Allow requests like Postman or curl without origin
-        return callback(null, true);
-      }
-      if (allowedOrigins.some((allowed) => origin.startsWith(allowed))) {
-        return callback(null, true);
-      }
-      console.warn("Blocked by CORS:", origin);
-      return callback(new Error("Not allowed by CORS"));
-    },
-    methods: ["GET", "POST", "PUT", "DELETE"],
-    credentials: true,
-  })
-);
-
 // Middleware
 app.use(express.json());
 app.use(helmet());
 app.use(morgan("dev"));
 
-//Static uploads with CORP headers
+// CORS setup
+const allowedOrigins = ["http://localhost:5173", "https://yourdomain.com"];
+app.use(
+  cors({
+    origin: (origin, callback) => {
+      if (!origin || allowedOrigins.includes(origin)) {
+        callback(null, true);
+      } else {
+        callback(new Error("Not allowed by CORS"));
+      }
+    },
+    credentials: true,
+  })
+);
+
+// Static uploads with CORP headers
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
 app.use(
   "/uploads",
-  cors(), // explicitly allow CORS for static files
-  express.static(path.join(__dirname, "../uploads"), {
+  express.static(path.join(__dirname, "uploads"), {
     setHeaders: (res) => {
-      const origin = res.req.headers.origin;
-      if (allowedOrigins.some((allowed) => origin.startsWith(allowed))) {
-        res.setHeader("Access-Control-Allow-Origin", origin);
-      }
+      res.setHeader("Access-Control-Allow-Origin", "http://localhost:5173");
+      res.setHeader("Access-Control-Allow-Credentials", "true");
       res.setHeader("Cross-Origin-Resource-Policy", "cross-origin");
       res.setHeader("Cross-Origin-Embedder-Policy", "require-corp");
       res.setHeader("Cross-Origin-Opener-Policy", "same-origin");
@@ -78,7 +62,7 @@ app.use(
   })
 );
 
-//Routes
+// Routes
 app.use("/api/auth", authRoutes);
 app.use("/api/quizzes", quizRoutes);
 app.use("/api/exams", examRoutes);
@@ -90,14 +74,13 @@ app.use("/api/users", userRoutes);
 app.use("/api/students", studentRoutes);
 app.use("/api/debug", debugRoutes);
 app.use("/api/admin/announcements", announcementRoutes);
-app.use("/api/admin/messages", messageRoutes);
-app.use("/api/superadmin", superAdminRoutes);
 
-//Error handler
+// Error handler
 app.use((err, req, res, next) => {
   console.error("Server error:", err.stack);
   res.status(500).json({ message: "Server error" });
 });
 
+// Start server
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => console.log(`Server running on port ${PORT}`));

@@ -1,50 +1,43 @@
 import express from "express";
 import multer from "multer";
-import { CloudinaryStorage } from "multer-storage-cloudinary";  // modern import
-import cloudinary from "../config/cloudinary.js";
+import fs from "fs";
+import path from "path";
 import {
   getQuizzes,
   submitQuiz,
   getSubjects,
   addQuiz,
-  downloadQuiz,
 } from "../controllers/quizController.js";
 import { authenticateToken } from "../middleware/authMiddleware.js";
 
 const router = express.Router();
 
-// Cloudinary storage setup
-const storage = new CloudinaryStorage({
-  cloudinary,
-  params: {
-    folder: "quizzes",              // Cloudinary folder
-    resource_type: "raw",           // allows PDF/Word uploads
-    type: "upload",
-    format: (req, file) => file.originalname.split(".").pop(), // keep extension
-    public_id: (req, file) => Date.now() + "-" + file.originalname,
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    const uploadPath = path.join("uploads", "quizzes");
+    // Ensure folder exists
+    fs.mkdirSync(uploadPath, { recursive: true });
+    cb(null, uploadPath);
+  },
+  filename: (req, file, cb) => {
+    cb(null, Date.now() + "-" + file.originalname);
   },
 });
 
 const upload = multer({ storage });
 
-// Get quizzes for student
+// Routes
 router.get("/", authenticateToken, getQuizzes);
 
-// Submit quiz answers
 router.post("/submit", authenticateToken, submitQuiz);
 
-// Get distinct subjects
 router.get("/subjects", authenticateToken, getSubjects);
 
-// Teacher uploads quiz (file or MCQ)
 router.post(
   "/",
   authenticateToken,
-  upload.single("quizFile"),
+  upload.single("quizFile"), // handles file upload
   addQuiz
 );
-
-// Student downloads quiz (redirects to Cloudinary URL)
-router.get("/download/:quizId", authenticateToken, downloadQuiz);
 
 export default router;
