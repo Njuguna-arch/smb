@@ -48,3 +48,10 @@ export const authorizeRole = (...roles) => {
     next();
   };
 };
+
+export const authorizeSuperAdmin = (req, res, next) => {
+  if (!req.user || req.user.role !== "superadmin") {
+    return res.status(403).json({ message: "Forbidden: Super Admin access required" });
+  }
+  next();
+};

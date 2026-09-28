@@ -1,26 +1,27 @@
 import express from "express";
 import multer from "multer";
-import fs from "fs";
-import path from "path";
+import { CloudinaryStorage } from "multer-storage-cloudinary";
+import cloudinary from "../config/cloudinary.js";
 import {
   getQuizzes,
   submitQuiz,
   getSubjects,
   addQuiz,
+  downloadQuiz,
 } from "../controllers/quizController.js";
 import { authenticateToken } from "../middleware/authMiddleware.js";
 
 const router = express.Router();
 
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    const uploadPath = path.join("uploads", "quizzes");
-    // Ensure folder exists
-    fs.mkdirSync(uploadPath, { recursive: true });
-    cb(null, uploadPath);
-  },
-  filename: (req, file, cb) => {
-    cb(null, Date.now() + "-" + file.originalname);
+// Cloudinary storage setup
+const storage = new CloudinaryStorage({
+  cloudinary,
+  params: {
+    folder: "quizzes",              // Cloudinary folder
+    resource_type: "raw",           // allows PDF/Word uploads
+    type: "upload",
+    format: (req, file) => file.originalname.split(".").pop(), // keep extension
+    public_id: (req, file) => Date.now() + "-" + file.originalname,
   },
 });
 
@@ -39,5 +40,7 @@ router.post(
   upload.single("quizFile"), // handles file upload
   addQuiz
 );
+
+router.get("/download/:quizId", authenticateToken, downloadQuiz);
 
 export default router;

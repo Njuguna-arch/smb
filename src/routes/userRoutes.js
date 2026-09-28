@@ -1,12 +1,20 @@
 import express from "express";
 import User from "../models/User.js";
+import { authenticateToken } from "../middleware/authMiddleware.js";
 
 const router = express.Router();
 
 router.get("/", async (req, res) => {
   try {
-    const students = await User.find({ role: "student" }).select("name grade _id");
-    res.json(students);
+    const students = await User.find({ role: "student" }).select("name grade _id photoUrl admissionNumber email schoolCode").lean();
+    const baseUrl = "https://raw.githubusercontent.com/Njuguna-arch/smb/main/uploads/";
+    const formattedStudents = students.map(student => ({
+      ...student,
+      photoUrl: student.photoUrl
+        ? (student.photoUrl.startsWith("http") ? student.photoUrl : `${baseUrl}${student.photoUrl}`)
+        : null
+    }));
+    res.json(formattedStudents);
   } catch (err) {
     console.error("Error fetching students:", err.message);
     res.status(500).json({ message: "Server error" });
@@ -15,10 +23,14 @@ router.get("/", async (req, res) => {
 
 router.get("/:id", async (req, res) => {
   try {
-    const user = await User.findById(req.params.id);
+    const user = await User.findById(req.params.id).lean();
     if (!user) {
       return res.status(404).json({ message: "User not found" });
     }
+    const baseUrl = "https://raw.githubusercontent.com/Njuguna-arch/smb/main/uploads/";
+    user.photoUrl = user.photoUrl
+      ? (user.photoUrl.startsWith("http") ? user.photoUrl : `${baseUrl}${user.photoUrl}`)
+      : null;
     res.json(user);
   } catch (err) {
     console.error("Error fetching user:", err.message);
@@ -26,15 +38,62 @@ router.get("/:id", async (req, res) => {
   }
 });
 
+router.get("/:id/completed-quizzes", authenticateToken, async (req, res) => {
+  try {
+    const student = await User.findById(req.params.id).select("completedQuizzes");
+    if (!student) {
+      return res.status(404).json({ message: "Student not found" });
+    }
+    res.json(student.completedQuizzes);
+  } catch (err) {
+    console.error("Error fetching completed quizzes:", err.message);
+    res.status(500).json({ message: "Server error" });
+  }
+});
+
 router.put("/:id", async (req, res) => {
   try {
-    const updatedUser = await User.findByIdAndUpdate(req.params.id, req.body, { new: true });
+    const updatedUser = await User.findByIdAndUpdate(req.params.id, req.body, { new: true }).lean();
     if (!updatedUser) {
       return res.status(404).json({ message: "User not found" });
     }
+    const baseUrl = "https://raw.githubusercontent.com/Njuguna-arch/smb/main/uploads/";
+    updatedUser.photoUrl = updatedUser.photoUrl ? `${baseUrl}${updatedUser.photoUrl}` : null;
     res.json(updatedUser);
   } catch (err) {
     console.error("Error updating user:", err.message);
+    res.status(500).json({ message: "Server error" });
+  }
+});
+
+// Assign an existing photo from /uploads to a user
+router.put("/assign-photo/:id", async (req, res) => {
+  try {
+    const userId = req.params.id;
+    const { photoFileName } = req.body;
+
+    if (!photoFileName) {
+      return res.status(400).json({ message: "Photo filename is required" });
+    }
+
+    const user = await User.findByIdAndUpdate(
+      userId,
+      { photoUrl: photoFileName },
+      { new: true }
+    );
+
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    const baseUrl = "https://raw.githubusercontent.com/Njuguna-arch/smb/main/uploads/";
+    res.json({
+      message: "Photo assigned successfully",
+      photoUrl: `${baseUrl}${photoFileName}`,
+      user,
+    });
+  } catch (err) {
+    console.error("Error assigning photo:", err.message);
     res.status(500).json({ message: "Server error" });
   }
 });

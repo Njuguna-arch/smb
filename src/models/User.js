@@ -37,7 +37,9 @@ const userSchema = new mongoose.Schema(
     schoolCode: { type: String, trim: true },
 
     grade: { type: String, trim: true },
-    photoUrl: { type: String },
+
+    // ✅ Only store the filename (e.g., "alice.jpg")
+    photoUrl: { type: String, trim: true },
 
     gender: {
       type: String,
@@ -59,6 +61,17 @@ const userSchema = new mongoose.Schema(
     completedQuizzes: [
       {
         quiz: { type: mongoose.Schema.Types.ObjectId, ref: "Quiz" },
+        answers: [
+          {
+            quizId: { type: mongoose.Schema.Types.ObjectId, ref: "Quiz" },
+            subject: String,
+            grade: String,
+            question: String,
+            selectedOption: String,
+            correctAnswer: String,
+            isCorrect: Boolean,
+          },
+        ],
         score: { type: Number },
         total: { type: Number },
         attemptedAt: { type: Date, default: Date.now },
@@ -69,9 +82,16 @@ const userSchema = new mongoose.Schema(
 );
 
 userSchema.pre("save", async function () {
-  if (!this.isModified("password")) return;
-  const salt = await bcrypt.genSalt(10);
-  this.password = await bcrypt.hash(this.password, salt);
+  if (this.isModified("admissionNumber") && this.role === "student") {
+    let code = this.schoolCode ? this.schoolCode.trim().toUpperCase() : "LA";
+    const clean = this.admissionNumber.trim().toUpperCase().replace(new RegExp(`^${code}`), "");
+    this.admissionNumber = `${code}${clean}`;
+  }
+
+  if (this.isModified("password")) {
+    const salt = await bcrypt.genSalt(10);
+    this.password = await bcrypt.hash(this.password, salt);
+  }
 });
 
 userSchema.methods.comparePassword = async function (candidatePassword) {

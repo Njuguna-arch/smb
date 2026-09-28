@@ -15,8 +15,13 @@ export const getPerformance = async (req, res) => {
 
 export const getUsers = async (req, res) => {
   try {
-    const users = await User.find();
-    res.json(users);
+    const users = await User.find().lean();
+    const baseUrl = "https://raw.githubusercontent.com/Njuguna-arch/smb/main/uploads/";
+    const formattedUsers = users.map(user => ({
+        ...user,
+        photoUrl: user.photoUrl ? `${baseUrl}${user.photoUrl}` : null
+    }));
+    res.json(formattedUsers);
   } catch (err) {
     res.status(500).json({ message: "Failed to fetch users", error: err.message });
   }
@@ -26,7 +31,12 @@ export const createUser = async (req, res) => {
   try {
     const user = new User(req.body);
     await user.save();
-    res.status(201).json(user);
+    
+    const savedUser = user.toObject();
+    const baseUrl = "https://raw.githubusercontent.com/Njuguna-arch/smb/main/uploads/";
+    savedUser.photoUrl = savedUser.photoUrl ? `${baseUrl}${savedUser.photoUrl}` : null;
+    
+    res.status(201).json(savedUser);
   } catch (err) {
     console.error("Create user error:", err);
 

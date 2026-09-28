@@ -19,6 +19,7 @@ import userRoutes from "./routes/userRoutes.js";
 import studentRoutes from "./routes/studentRoutes.js";
 import debugRoutes from "./routes/debugRoutes.js";
 import announcementRoutes from "./routes/announcementRoutes.js";
+import superAdminRoutes from "./routes/superAdminRoutes.js";
 
 dotenv.config();
 connectDB();
@@ -31,15 +32,24 @@ app.use(helmet());
 app.use(morgan("dev"));
 
 // CORS setup
-const allowedOrigins = ["http://localhost:5173", "https://yourdomain.com"];
+const allowedOrigins = [
+  "https://gratheracademy.netlify.app",
+  "https://liskanacademy.vercel.app",
+  "http://localhost:3000",
+  "http://localhost:5173",
+  "https://gratheracademy.vercel.app"
+];
+
 app.use(
   cors({
     origin: (origin, callback) => {
-      if (!origin || allowedOrigins.includes(origin)) {
-        callback(null, true);
-      } else {
-        callback(new Error("Not allowed by CORS"));
+      if (!origin) {
+        return callback(null, true);
       }
+      if (allowedOrigins.some((allowed) => origin.startsWith(allowed))) {
+        return callback(null, true);
+      }
+      return callback(new Error("Not allowed by CORS"));
     },
     credentials: true,
   })
@@ -51,9 +61,11 @@ const __dirname = dirname(__filename);
 
 app.use(
   "/uploads",
-  express.static(path.join(__dirname, "uploads"), {
+  cors(),
+  express.static(path.join(__dirname, "../uploads"), {
     setHeaders: (res) => {
-      res.setHeader("Access-Control-Allow-Origin", "http://localhost:5173");
+      const origin = res.req ? res.req.headers.origin : "*";
+      res.setHeader("Access-Control-Allow-Origin", origin || "*");
       res.setHeader("Access-Control-Allow-Credentials", "true");
       res.setHeader("Cross-Origin-Resource-Policy", "cross-origin");
       res.setHeader("Cross-Origin-Embedder-Policy", "require-corp");
@@ -74,6 +86,7 @@ app.use("/api/users", userRoutes);
 app.use("/api/students", studentRoutes);
 app.use("/api/debug", debugRoutes);
 app.use("/api/admin/announcements", announcementRoutes);
+app.use("/api/superadmin", superAdminRoutes);
 
 // Error handler
 app.use((err, req, res, next) => {

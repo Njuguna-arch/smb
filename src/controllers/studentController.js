@@ -7,16 +7,20 @@ export const getStudentById = async (req, res) => {
       return res.status(404).json({ message: "Student not found" });
     }
 
+    const baseUrl = "https://raw.githubusercontent.com/Njuguna-arch/smb/main/uploads/";
+    
     res.json({
+      _id: student._id,
       id: student._id,
       name: student.name,
       admissionNumber: student.admissionNumber || "N/A",
       grade: student.grade,
       email: student.email,
-      photoUrl: student.photoUrl,
+      photoUrl: student.photoUrl ? (student.photoUrl.startsWith("http") ? student.photoUrl : `${baseUrl}${student.photoUrl}`) : null,
       gender: student.gender,
       dateOfBirth: student.dateOfBirth,
       classTeacher: student.classTeacher,
+      schoolCode: student.schoolCode,
     });
   } catch (err) {
     console.error("Error fetching student:", err.message);
@@ -41,11 +45,16 @@ export const updateStudentById = async (req, res) => {
         classTeacher,
       },
       { new: true }
-    );
+    ).lean();
 
     if (!updatedStudent) {
       return res.status(404).json({ message: "Student not found" });
     }
+
+    const baseUrl = "https://raw.githubusercontent.com/Njuguna-arch/smb/main/uploads/";
+    updatedStudent.photoUrl = updatedStudent.photoUrl
+      ? (updatedStudent.photoUrl.startsWith("http") ? updatedStudent.photoUrl : `${baseUrl}${updatedStudent.photoUrl}`)
+      : null;
 
     res.json(updatedStudent);
   } catch (err) {

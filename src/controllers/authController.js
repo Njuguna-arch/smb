@@ -5,39 +5,31 @@ export const loginUser = async (req, res) => {
   const { email, admissionNumber, password, role, schoolCode } = req.body;
 
   try {
-    console.log("Login payload received:", req.body);
-
     let user;
 
     if (role === "student") {
-      const normalizedAdmission = admissionNumber?.trim().toUpperCase();
+      let code = schoolCode ? schoolCode.trim().toUpperCase() : "LA";
+      const clean = admissionNumber?.trim().toUpperCase().replace(new RegExp(`^${code}`), "");
+      const normalizedAdmission = `${code}${clean}`;
       user = await User.findOne({
         admissionNumber: normalizedAdmission,
         role: "student",
         schoolCode,
       });
-      console.log("Student login attempt:", normalizedAdmission);
     } else if (role === "superadmin") {
       const normalizedEmail = email?.trim().toLowerCase();
       user = await User.findOne({ email: normalizedEmail, role: "superadmin" });
-      console.log("Super Admin login attempt:", normalizedEmail);
     } else {
       const normalizedEmail = email?.trim().toLowerCase();
       user = await User.findOne({ email: normalizedEmail, role, schoolCode });
-      console.log("Staff login attempt:", normalizedEmail);
     }
 
     if (!user) {
-      console.log("No user found for role:", role);
       return res.status(401).json({ message: "Invalid credentials" });
     }
 
     const isMatch = await user.comparePassword(password);
     if (!isMatch) {
-      console.log(
-        "Password mismatch for:",
-        role === "student" ? admissionNumber : email
-      );
       return res.status(401).json({ message: "Invalid credentials" });
     }
 
@@ -51,16 +43,9 @@ export const loginUser = async (req, res) => {
       { expiresIn: "1d" }
     );
 
-    console.log(
-      "Login successful:",
-      user.name,
-      "| Role:",
-      user.role,
-      "| Grade:",
-      user.grade,
-      "| ID:",
-      user._id
-    );
+    // Build GitHub raw URL for photo
+    const baseUrl = "https://raw.githubusercontent.com/Njuguna-arch/smb/main/uploads/";
+    const photoUrl = user.photoUrl ? `${baseUrl}${user.photoUrl}` : null;
 
     res.json({
       token,
@@ -70,8 +55,12 @@ export const loginUser = async (req, res) => {
         role: user.role,
         admissionNumber: user.admissionNumber,
         grade: user.grade,
-        photoUrl: user.photoUrl,
+        photoUrl,
         email: user.email,
+        gender: user.gender,
+        dateOfBirth: user.dateOfBirth,
+        schoolCode: user.schoolCode,
+        classTeacher: user.classTeacher,
       },
     });
   } catch (err) {
