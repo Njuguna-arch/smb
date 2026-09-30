@@ -1,8 +1,7 @@
 import express from "express";
 import multer from "multer";
 import cloudinary from "../config/cloudinary.js";
-import cloudinaryStoragePkg from "multer-storage-cloudinary";
-const CloudinaryStorage = cloudinaryStoragePkg.CloudinaryStorage;
+import { CloudinaryStorage } from "../utils/cloudinaryStorage.js";
 
 import {
   getQuizzes,
