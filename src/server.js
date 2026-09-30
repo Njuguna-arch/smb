@@ -33,7 +33,6 @@ app.use(morgan("dev"));
 
 // CORS setup
 const allowedOrigins = [
-  "https://gratheracademy.netlify.app",
   "https://liskanacademy.vercel.app",
   "http://localhost:3000",
   "http://localhost:5173",
