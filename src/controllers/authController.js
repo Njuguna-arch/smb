@@ -8,20 +8,41 @@ export const loginUser = async (req, res) => {
     let user;
 
     if (role === "student") {
-      let code = schoolCode ? schoolCode.trim().toUpperCase() : "LA";
-      const clean = admissionNumber?.trim().toUpperCase().replace(new RegExp(`^${code}`), "");
-      const normalizedAdmission = `${code}${clean}`;
+      const normalizedAdmission = admissionNumber?.trim().toUpperCase();
+      const trimmedSchoolCode = schoolCode?.trim();
+      const schoolCodeQuery = trimmedSchoolCode
+        ? new RegExp(`^${trimmedSchoolCode}$`, "i")
+        : trimmedSchoolCode;
+
       user = await User.findOne({
         admissionNumber: normalizedAdmission,
         role: "student",
-        schoolCode,
+        ...(schoolCodeQuery ? { schoolCode: schoolCodeQuery } : {}),
       });
+
+      // Fallback: In case the student entered only the digits without the "LA" prefix (e.g. "070" instead of "LA070")
+      if (!user && normalizedAdmission && !normalizedAdmission.startsWith("LA")) {
+        user = await User.findOne({
+          admissionNumber: `LA${normalizedAdmission}`,
+          role: "student",
+          ...(schoolCodeQuery ? { schoolCode: schoolCodeQuery } : {}),
+        });
+      }
     } else if (role === "superadmin") {
       const normalizedEmail = email?.trim().toLowerCase();
       user = await User.findOne({ email: normalizedEmail, role: "superadmin" });
     } else {
       const normalizedEmail = email?.trim().toLowerCase();
-      user = await User.findOne({ email: normalizedEmail, role, schoolCode });
+      const trimmedSchoolCode = schoolCode?.trim();
+      const schoolCodeQuery = trimmedSchoolCode
+        ? new RegExp(`^${trimmedSchoolCode}$`, "i")
+        : trimmedSchoolCode;
+
+      user = await User.findOne({
+        email: normalizedEmail,
+        role,
+        ...(schoolCodeQuery ? { schoolCode: schoolCodeQuery } : {}),
+      });
     }
 
     if (!user) {

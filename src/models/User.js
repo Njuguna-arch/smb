@@ -82,10 +82,8 @@ const userSchema = new mongoose.Schema(
 );
 
 userSchema.pre("save", async function () {
-  if (this.isModified("admissionNumber") && this.role === "student") {
-    let code = this.schoolCode ? this.schoolCode.trim().toUpperCase() : "LA";
-    const clean = this.admissionNumber.trim().toUpperCase().replace(new RegExp(`^${code}`), "");
-    this.admissionNumber = `${code}${clean}`;
+  if (this.isModified("admissionNumber") && this.role === "student" && this.admissionNumber) {
+    this.admissionNumber = this.admissionNumber.trim().toUpperCase();
   }
 
   if (this.isModified("password")) {
