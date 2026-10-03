@@ -1,6 +1,7 @@
 import User from "../models/User.js";
 import Announcement from "../models/AnnouncementModel.js";
 import ExamResult from "../models/ExamResult.js";
+import { logActivity } from "../models/SystemLog.js";
 
 export const getPerformance = async (req, res) => {
   try {
@@ -15,11 +16,16 @@ export const getPerformance = async (req, res) => {
 
 export const getUsers = async (req, res) => {
   try {
-    const users = await User.find().lean();
+    const filter =
+      req.user && req.user.role === "admin" && req.user.schoolCode
+        ? { schoolCode: new RegExp(`^${req.user.schoolCode}$`, "i") }
+        : {};
+
+    const users = await User.find(filter).lean();
     const baseUrl = "https://raw.githubusercontent.com/Njuguna-arch/smb/main/uploads/";
-    const formattedUsers = users.map(user => ({
-        ...user,
-        photoUrl: user.photoUrl ? `${baseUrl}${user.photoUrl}` : null
+    const formattedUsers = users.map((user) => ({
+      ...user,
+      photoUrl: user.photoUrl ? `${baseUrl}${user.photoUrl}` : null,
     }));
     res.json(formattedUsers);
   } catch (err) {
@@ -29,13 +35,29 @@ export const getUsers = async (req, res) => {
 
 export const createUser = async (req, res) => {
   try {
-    const user = new User(req.body);
+    const userData = { ...req.body };
+
+    // Automatically associate user with admin's school if created by school admin
+    if (req.user && req.user.role === "admin" && req.user.schoolCode) {
+      userData.schoolCode = req.user.schoolCode;
+    }
+
+    const user = new User(userData);
     await user.save();
-    
+
+    await logActivity({
+      action: "USER_CREATED",
+      details: `${user.role?.toUpperCase()} "${user.name}" (${user.email || user.admissionNumber}) created by admin "${req.user?.name || req.user?.email || "Admin"}". School: ${user.schoolCode || "N/A"}`,
+      performedBy: req.user?.name || "Admin",
+      performedByRole: req.user?.role || "admin",
+      schoolCode: user.schoolCode || null,
+      level: "info",
+    });
+
     const savedUser = user.toObject();
     const baseUrl = "https://raw.githubusercontent.com/Njuguna-arch/smb/main/uploads/";
     savedUser.photoUrl = savedUser.photoUrl ? `${baseUrl}${savedUser.photoUrl}` : null;
-    
+
     res.status(201).json(savedUser);
   } catch (err) {
     console.error("Create user error:", err);
@@ -54,10 +76,29 @@ export const createUser = async (req, res) => {
   }
 };
 
-
 export const deleteUser = async (req, res) => {
   try {
+    const query = { _id: req.params.id };
+    if (req.user && req.user.role === "admin" && req.user.schoolCode) {
+      query.schoolCode = new RegExp(`^${req.user.schoolCode}$`, "i");
+    }
+
+    const userToDelete = await User.findOne(query);
+    if (!userToDelete) {
+      return res.status(404).json({ message: "User not found or unauthorized to delete" });
+    }
+
     await User.findByIdAndDelete(req.params.id);
+
+    await logActivity({
+      action: "USER_DELETED",
+      details: `${userToDelete.role?.toUpperCase()} "${userToDelete.name}" deleted by admin "${req.user?.name || "Admin"}"`,
+      performedBy: req.user?.name || "Admin",
+      performedByRole: req.user?.role || "admin",
+      schoolCode: userToDelete.schoolCode || null,
+      level: "warning",
+    });
+
     res.status(204).end();
   } catch (err) {
     res.status(500).json({ message: "Failed to delete user", error: err.message });

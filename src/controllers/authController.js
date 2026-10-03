@@ -1,4 +1,6 @@
 import User from "../models/User.js";
+import School from "../models/School.js";
+import { logActivity } from "../models/SystemLog.js";
 import jwt from "jsonwebtoken";
 
 export const loginUser = async (req, res) => {
@@ -47,6 +49,16 @@ export const loginUser = async (req, res) => {
 
     if (!user) {
       return res.status(401).json({ message: "Invalid credentials" });
+    }
+
+    // Check if school is disabled
+    if (user.schoolCode && user.role !== "superadmin") {
+      const school = await School.findOne({ code: new RegExp(`^${user.schoolCode}$`, "i") });
+      if (school && school.status === "disabled") {
+        return res.status(403).json({
+          message: "This school has been disabled by the system administrator. Please contact your administrator.",
+        });
+      }
     }
 
     const isMatch = await user.comparePassword(password);

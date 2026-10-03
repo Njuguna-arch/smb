@@ -7,8 +7,11 @@ import {
   createAnnouncement,
 } from "../controllers/adminController.js";
 import { getSchoolPerformance } from "../controllers/examController.js";
+import { authenticateToken } from "../middleware/authMiddleware.js";
 
 const router = express.Router();
+
+router.use(authenticateToken);
 
 router.get("/performance", getSchoolPerformance);
 

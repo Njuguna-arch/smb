@@ -141,8 +141,19 @@ const getExamResultPDF = async (req, res) => {
   const { admissionNumber, examType, term, year } = req.params;
 
   try {
-    const exam = await ExamResult.findOne({ admissionNumber, examType, term, year })
-      .populate("studentId");
+    const cleanAdm = admissionNumber ? admissionNumber.trim() : "";
+    const admRegex = cleanAdm.startsWith("LA")
+      ? new RegExp(`^(${cleanAdm}|${cleanAdm.replace(/^LA/i, "")})$`, "i")
+      : new RegExp(`^(LA)?${cleanAdm}$`, "i");
+
+    const query = {
+      admissionNumber: admRegex,
+      examType: new RegExp(`^${examType?.trim()}$`, "i"),
+      term: new RegExp(`^${term?.trim()}$`, "i"),
+      year: Number(year),
+    };
+
+    const exam = await ExamResult.findOne(query).populate("studentId");
 
     if (!exam) {
       return res.status(404).json({ message: "Exam not found" });

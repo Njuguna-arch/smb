@@ -7,6 +7,7 @@ import {
   getExamResultPDF,
   getAllUploadedExams,
 } from "../controllers/examController.js";
+import { generateStudentReportPDF } from "../controllers/debugController.js";
 
 const router = express.Router();
 const upload = multer({ dest: "uploads/" });
@@ -16,6 +17,10 @@ router.post("/upload", authenticateToken, upload.single("file"), uploadExamResul
 
 // Get all uploaded exams (for teacher/admin)
 router.get("/", authenticateToken, getAllUploadedExams);
+
+// Report PDF generation from JSON payload
+router.post("/student-report", generateStudentReportPDF);
+router.post("/generate-pdf", generateStudentReportPDF);
 
 // Get results for a specific student
 router.get("/:admissionNumber", authenticateToken, getStudentResults);
