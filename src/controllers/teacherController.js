@@ -67,17 +67,37 @@ const addDisciplineComment = async (req, res) => {
 
 const getClassPerformance = async (req, res) => {
   try {
-    const teacherClass = req.user?.className || req.user?.grade;
-    if (!teacherClass) {
-      return res.status(403).json({ message: "No class assigned to this teacher" });
+    const rawClass =
+      req.query.className ||
+      req.user?.classTeacher ||
+      req.user?.className ||
+      req.user?.grade;
+
+    if (!rawClass || rawClass.toLowerCase() === "null" || rawClass.trim() === "") {
+      return res.json({
+        performance: [],
+        totalScore: 0,
+        meanScore: 0,
+        message: "No class assigned to this teacher",
+      });
     }
 
     const { examType, term, year } = req.query;
 
-    const matchStage = { className: teacherClass };
-    if (examType) matchStage.examType = examType;
-    if (term) matchStage.term = term;
-    if (year) matchStage.year = Number(year);
+    const cleanClass = rawClass.replace(/^Grade\s*/i, "").trim();
+    const matchStage = {
+      className: { $regex: new RegExp(`^(Grade\\s*)?${cleanClass}$`, "i") },
+    };
+
+    if (examType && examType.trim()) {
+      matchStage.examType = { $regex: new RegExp(`^${examType.trim()}$`, "i") };
+    }
+    if (term && term.trim()) {
+      matchStage.term = { $regex: new RegExp(`^${term.trim()}$`, "i") };
+    }
+    if (year && !isNaN(Number(year))) {
+      matchStage.year = Number(year);
+    }
 
     console.log("🔍 Match stage:", matchStage);
 
@@ -86,16 +106,22 @@ const getClassPerformance = async (req, res) => {
       { $unwind: "$subjectResults" },
       {
         $match: {
-          "subjectResults.subjectName": { $exists: true, $ne: "" },
-          "subjectResults.marks": { $exists: true, $ne: null },
+          $or: [
+            { "subjectResults.subjectName": { $exists: true, $ne: "" } },
+            { "subjectResults.subject": { $exists: true, $ne: "" } },
+          ],
         },
       },
       {
         $project: {
-          subject: "$subjectResults.subjectName",
+          subject: {
+            $ifNull: ["$subjectResults.subjectName", "$subjectResults.subject"],
+          },
           score: {
             $convert: {
-              input: "$subjectResults.marks",
+              input: {
+                $ifNull: ["$subjectResults.marks", "$subjectResults.score"],
+              },
               to: "double",
               onError: 0,
               onNull: 0,
@@ -123,15 +149,19 @@ const getClassPerformance = async (req, res) => {
       { $unwind: "$subjectResults" },
       {
         $match: {
-          "subjectResults.subjectName": { $exists: true, $ne: "" },
-          "subjectResults.marks": { $exists: true, $ne: null },
+          $or: [
+            { "subjectResults.subjectName": { $exists: true, $ne: "" } },
+            { "subjectResults.subject": { $exists: true, $ne: "" } },
+          ],
         },
       },
       {
         $project: {
           score: {
             $convert: {
-              input: "$subjectResults.marks",
+              input: {
+                $ifNull: ["$subjectResults.marks", "$subjectResults.score"],
+              },
               to: "double",
               onError: 0,
               onNull: 0,
@@ -157,27 +187,41 @@ const getClassPerformance = async (req, res) => {
       meanScore,
     });
   } catch (err) {
-    console.error("Error fetching class performance:", err.message);
-    res.status(500).json({ message: "Server error" });
+    console.error("Error fetching class performance:", err);
+    res.status(500).json({ message: "Server error", error: err.message });
   }
 };
 
 const getStudentCompletedQuizzes = async (req, res) => {
   try {
     const { studentId } = req.params;
+    const { subject } = req.query;
+
     const student = await User.findById(studentId).populate(
       "completedQuizzes.quiz",
-      "subject grade question options correctAnswer"
+      "subject grade question options correctAnswer type fileUrl"
     );
 
     if (!student) {
       return res.status(404).json({ message: "Student not found" });
     }
 
-    res.json(student.completedQuizzes);
+    let completed = student.completedQuizzes || [];
+    if (subject && subject.trim() && subject.toLowerCase() !== "all") {
+      const subjectRegex = new RegExp(`^${subject.trim()}$`, "i");
+      completed = completed.filter((item) => {
+        const quizSubject =
+          item.quiz?.subject ||
+          item.answers?.[0]?.subject ||
+          item.subject;
+        return quizSubject && subjectRegex.test(quizSubject.trim());
+      });
+    }
+
+    res.json(completed);
   } catch (err) {
-    console.error("Error fetching student completed quizzes:", err.message);
-    res.status(500).json({ message: "Server error" });
+    console.error("Error fetching student completed quizzes:", err);
+    res.status(500).json({ message: "Server error", error: err.message });
   }
 };
 

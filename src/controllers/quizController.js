@@ -109,7 +109,10 @@ export const addQuiz = async (req, res) => {
 
     let quizData = { subject, grade, type };
 
-    if (type === "file" && req.file) {
+    if (type === "file") {
+      if (!req.file || !req.file.path) {
+        return res.status(400).json({ message: "Quiz file is required for file-based quiz" });
+      }
       quizData.fileUrl = req.file.path; // Cloudinary URL
     } else if (type === "mcq") {
       quizData.question = question;
@@ -133,8 +136,8 @@ export const addQuiz = async (req, res) => {
 
     res.status(201).json({ message: "Quiz added successfully", quiz });
   } catch (err) {
-    console.error("Error adding quiz:", err.message);
-    res.status(500).json({ message: "Server error" });
+    console.error("Error adding quiz:", err);
+    res.status(500).json({ message: err.message || "Server error" });
   }
 };
 

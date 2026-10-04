@@ -97,14 +97,16 @@ export const generateStudentReportPDF = async (req, res) => {
     const borderColor = "#cfd8dc";
 
     // Top Header Banner
-    doc.rect(40, 40, 515, 60).fill(primaryColor);
-    doc.fillColor("#ffffff").font("Helvetica-Bold").fontSize(20);
-    doc.text(schoolName.toUpperCase(), 40, 52, { width: 515, align: "center" });
-    doc.fontSize(11).font("Helvetica");
-    doc.text("OFFICIAL STUDENT EXAM REPORT CARD", 40, 77, { width: 515, align: "center" });
+    doc.rect(40, 36, 515, 70).fill(primaryColor);
+    doc.fillColor("#ffffff").font("Helvetica-Bold").fontSize(18);
+    doc.text(schoolName.toUpperCase(), 40, 46, { width: 515, align: "center" });
+    doc.fontSize(13);
+    doc.text(`STUDENT: ${name.toUpperCase()}`, 40, 68, { width: 515, align: "center" });
+    doc.fontSize(9.5).font("Helvetica");
+    doc.text("OFFICIAL STUDENT EXAM REPORT CARD", 40, 88, { width: 515, align: "center" });
 
     // Student Info Card
-    const infoY = 115;
+    const infoY = 116;
     doc.rect(40, infoY, 515, 75).fillAndStroke("#ffffff", borderColor);
 
     doc.fillColor(darkGray).fontSize(10);
@@ -129,22 +131,26 @@ export const generateStudentReportPDF = async (req, res) => {
     doc.font("Helvetica-Bold").text("Date Issued:", 330, infoY + 52);
     doc.font("Helvetica").text(new Date().toLocaleDateString("en-GB"), 430, infoY + 52);
 
-    // Results Table
+    // Results Table with full borders
     const tableTop = 205;
-    const colX = {
-      subject: 55,
-      marks: 270,
-      grade: 360,
-      points: 450,
-    };
+    const colDiv1 = 240;
+    const colDiv2 = 340;
+    const colDiv3 = 440;
+    const tableRight = 555;
+    const rowHeight = 24;
 
-    // Table Header
-    doc.rect(40, tableTop, 515, 26).fill(primaryColor);
+    // Table Header in Green
+    doc.rect(40, tableTop, 515, 26).fillAndStroke(primaryColor, primaryColor);
+    doc.strokeColor("#ffffff").lineWidth(0.5);
+    doc.moveTo(colDiv1, tableTop).lineTo(colDiv1, tableTop + 26).stroke();
+    doc.moveTo(colDiv2, tableTop).lineTo(colDiv2, tableTop + 26).stroke();
+    doc.moveTo(colDiv3, tableTop).lineTo(colDiv3, tableTop + 26).stroke();
+
     doc.fillColor("#ffffff").font("Helvetica-Bold").fontSize(10);
-    doc.text("SUBJECT", colX.subject, tableTop + 8);
-    doc.text("MARKS (%)", colX.marks, tableTop + 8, { width: 70, align: "center" });
-    doc.text("GRADE", colX.grade, tableTop + 8, { width: 70, align: "center" });
-    doc.text("LUBRICS / PTS", colX.points, tableTop + 8, { width: 85, align: "center" });
+    doc.text("SUBJECT", 45, tableTop + 8, { width: 190, align: "center" });
+    doc.text("MARKS (%)", colDiv1, tableTop + 8, { width: 100, align: "center" });
+    doc.text("GRADE", colDiv2, tableTop + 8, { width: 100, align: "center" });
+    doc.text("RUBRICS / POINTS", colDiv3, tableTop + 8, { width: 115, align: "center" });
 
     let currentY = tableTop + 26;
     let totalMarks = 0;
@@ -152,35 +158,48 @@ export const generateStudentReportPDF = async (req, res) => {
 
     subjects.forEach((subj, index) => {
       const rowBg = index % 2 === 0 ? "#ffffff" : lightGray;
-      doc.rect(40, currentY, 515, 24).fill(rowBg);
+      doc.rect(40, currentY, 515, rowHeight).fillAndStroke(rowBg, borderColor);
+
+      // Vertical cell borders
+      doc.strokeColor(borderColor).lineWidth(0.5);
+      doc.moveTo(colDiv1, currentY).lineTo(colDiv1, currentY + rowHeight).stroke();
+      doc.moveTo(colDiv2, currentY).lineTo(colDiv2, currentY + rowHeight).stroke();
+      doc.moveTo(colDiv3, currentY).lineTo(colDiv3, currentY + rowHeight).stroke();
 
       doc.fillColor(darkGray).font("Helvetica").fontSize(10);
-      doc.text(subj.name || "Subject", colX.subject, currentY + 7);
+      doc.text(subj.name || "Subject", 50, currentY + 7);
 
       const m = Number(subj.marks);
       if (!isNaN(m)) {
         totalMarks += m;
         count++;
-        doc.text(m.toString(), colX.marks, currentY + 7, { width: 70, align: "center" });
+        doc.text(m.toString(), colDiv1, currentY + 7, { width: 100, align: "center" });
       } else {
-        doc.text("-", colX.marks, currentY + 7, { width: 70, align: "center" });
+        doc.text("-", colDiv1, currentY + 7, { width: 100, align: "center" });
       }
 
-      doc.font("Helvetica-Bold").text(subj.grade || "-", colX.grade, currentY + 7, { width: 70, align: "center" });
-      doc.font("Helvetica").text(String(subj.points ?? "-"), colX.points, currentY + 7, { width: 85, align: "center" });
+      doc.font("Helvetica-Bold").text(subj.grade || "-", colDiv2, currentY + 7, { width: 100, align: "center" });
+      doc.font("Helvetica").text(String(subj.points ?? "-"), colDiv3, currentY + 7, { width: 115, align: "center" });
 
-      // Row bottom border
-      doc.moveTo(40, currentY + 24).lineTo(555, currentY + 24).strokeColor(borderColor).stroke();
-      currentY += 24;
+      currentY += rowHeight;
     });
 
-    // Summary Row
+    // Summary Row with borders
     const avgMarks = count > 0 ? (totalMarks / count).toFixed(1) : "N/A";
-    doc.rect(40, currentY, 515, 26).fill("#e8f5e9");
+    doc.rect(40, currentY, 515, 26).fillAndStroke("#e8f5e9", borderColor);
+    doc.strokeColor(borderColor).lineWidth(0.5);
+    doc.moveTo(colDiv1, currentY).lineTo(colDiv1, currentY + 26).stroke();
+    doc.moveTo(colDiv2, currentY).lineTo(colDiv2, currentY + 26).stroke();
+    doc.moveTo(colDiv3, currentY).lineTo(colDiv3, currentY + 26).stroke();
+
     doc.fillColor(primaryColor).font("Helvetica-Bold").fontSize(10);
-    doc.text("TOTAL / AVERAGE:", colX.subject, currentY + 8);
-    doc.text(`${totalMarks} (Avg: ${avgMarks}%)`, colX.marks, currentY + 8, { width: 140, align: "left" });
-    doc.text(`Overall: ${grade}`, colX.points, currentY + 8, { width: 85, align: "center" });
+    doc.text("TOTAL / AVERAGE:", 45, currentY + 8, { width: 190, align: "center" });
+    doc.text(`${totalMarks} (Avg: ${avgMarks}%)`, colDiv1, currentY + 8, { width: 100, align: "center" });
+    doc.text(`Overall: ${grade}`, colDiv2, currentY + 8, { width: 100, align: "center" });
+    doc.text("-", colDiv3, currentY + 8, { width: 115, align: "center" });
+
+    // Outer table border
+    doc.rect(40, tableTop, 515, currentY + 26 - tableTop).strokeColor(primaryColor).lineWidth(1).stroke();
     currentY += 36;
 
     // Teacher's Comment Box

@@ -14,15 +14,22 @@ import { authenticateToken } from "../middleware/authMiddleware.js";
 
 const router = express.Router();
 
-// Cloudinary storage setup
+// Cloudinary storage setup for raw files (PDF/Word)
 const storage = new CloudinaryStorage({
   cloudinary,
   params: {
-    folder: "quizzes",              // Cloudinary folder
-    resource_type: "raw",           // allows PDF/Word uploads
+    folder: "quizzes",
+    resource_type: "raw",
     type: "upload",
-    format: (req, file) => file.originalname.split(".").pop(), // keep extension
-    public_id: (req, file) => Date.now() + "-" + file.originalname,
+    public_id: (req, file) => {
+      const ext = file.originalname.split(".").pop();
+      const rawBase = file.originalname.substring(0, file.originalname.lastIndexOf("."));
+      const sanitizedBase = (rawBase || "quiz")
+        .replace(/[^a-zA-Z0-9_-]/g, "_")
+        .replace(/_+/g, "_")
+        .replace(/^_|_$/g, "");
+      return `${Date.now()}-${sanitizedBase}.${ext}`;
+    },
   },
 });
 

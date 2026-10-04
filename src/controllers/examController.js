@@ -168,49 +168,114 @@ const getExamResultPDF = async (req, res) => {
     const doc = new PDFDocument({ margin: 40 });
     doc.pipe(res);
 
-    doc.fontSize(18).text(`Exam Results - ${examType} ${term} ${year}`, { align: "center" });
-    doc.moveDown();
-    doc.fontSize(12).text(`Student: ${exam.studentId?.name || "N/A"}`);
-    doc.text(`Admission Number: ${exam.admissionNumber}`);
-    doc.text(`Overall Grade: ${exam.overallGrade || "N/A"}`);
-    doc.moveDown();
+    const primaryColor = "#2e7d32";
+    const darkColor = "#263238";
+    const borderColor = "#cfd8dc";
 
-    const tableTop = doc.y;
-    const colWidths = [150, 100, 100, 100]; 
+    // Top Header Banner in Green
+    doc.rect(40, 36, 515, 68).fill(primaryColor);
+    doc.fillColor("#ffffff").font("Helvetica-Bold").fontSize(18);
+    doc.text("EDUSPHERE ACADEMY", 40, 46, { width: 515, align: "center" });
 
-    doc.font("Helvetica-Bold");
-    doc.text("Subject", 50, tableTop, { width: colWidths[0], align: "center" });
-    doc.text("Marks", 200, tableTop, { width: colWidths[1], align: "center" });
-    doc.text("Grade", 300, tableTop, { width: colWidths[2], align: "center" });
-    doc.text("Points", 400, tableTop, { width: colWidths[3], align: "center" });
+    // Student Name in the middle of the header
+    const studentName = exam.studentId?.name || "Student";
+    doc.fontSize(13);
+    doc.text(`STUDENT: ${studentName.toUpperCase()}`, 40, 68, { width: 515, align: "center" });
+    doc.fontSize(9.5).font("Helvetica");
+    doc.text(`EXAM REPORT CARD — ${examType.toUpperCase()} ${term.toUpperCase()} ${year}`, 40, 87, { width: 515, align: "center" });
 
-    doc.moveDown();
-    doc.font("Helvetica");
+    // Student Info Card
+    const infoY = 114;
+    doc.rect(40, infoY, 515, 65).fillAndStroke("#ffffff", borderColor);
+    doc.fillColor(darkColor).fontSize(10);
+    doc.font("Helvetica-Bold").text("Admission No:", 55, infoY + 12);
+    doc.font("Helvetica").text(exam.admissionNumber, 155, infoY + 12);
 
-    let rowY = tableTop + 20;
-exam.subjectResults.forEach((subj) => {
-  const points = getPointsFromGrade(subj.grade);
+    doc.font("Helvetica-Bold").text("Class / Grade:", 55, infoY + 34);
+    doc.font("Helvetica").text(exam.className || "N/A", 155, infoY + 34);
 
-  doc.text(subj.subjectName, 50, rowY, { width: colWidths[0], align: "center" });
-  doc.text(subj.marks.toString(), 200, rowY, { width: colWidths[1], align: "center" });
-  doc.text(subj.grade, 300, rowY, { width: colWidths[2], align: "center" });
-  doc.text(points.toString(), 400, rowY, { width: colWidths[3], align: "center" });
+    doc.font("Helvetica-Bold").text("Overall Grade:", 330, infoY + 12);
+    doc.font("Helvetica-Bold").fillColor(primaryColor).text(exam.overallGrade || "N/A", 430, infoY + 12);
 
-  rowY += 20;
-});
+    doc.fillColor(darkColor).font("Helvetica-Bold").text("Date Issued:", 330, infoY + 34);
+    doc.font("Helvetica").text(new Date().toLocaleDateString("en-GB"), 430, infoY + 34);
 
-doc.moveDown(2);
+    // Table with complete cell borders
+    const tableTop = 190;
+    const colDiv1 = 240;
+    const colDiv2 = 340;
+    const colDiv3 = 440;
+    const rowH = 22;
 
-const pageWidth = doc.page.width;
-const margin = doc.page.margins.left;
+    // Table Header in Green
+    doc.rect(40, tableTop, 515, 24).fillAndStroke(primaryColor, primaryColor);
+    doc.strokeColor("#ffffff").lineWidth(0.5);
+    doc.moveTo(colDiv1, tableTop).lineTo(colDiv1, tableTop + 24).stroke();
+    doc.moveTo(colDiv2, tableTop).lineTo(colDiv2, tableTop + 24).stroke();
+    doc.moveTo(colDiv3, tableTop).lineTo(colDiv3, tableTop + 24).stroke();
 
-doc.font("Helvetica-Bold")
-   .text(`Teacher's Comment: ${exam.overallComment || "N/A"}`, margin, doc.y, {
-     width: pageWidth - margin * 2,
-     align: "center"
-   });
+    doc.fillColor("#ffffff").font("Helvetica-Bold").fontSize(10);
+    doc.text("SUBJECT", 45, tableTop + 7, { width: 190, align: "center" });
+    doc.text("MARKS (%)", colDiv1, tableTop + 7, { width: 100, align: "center" });
+    doc.text("GRADE", colDiv2, tableTop + 7, { width: 100, align: "center" });
+    doc.text("RUBRICS / POINTS", colDiv3, tableTop + 7, { width: 115, align: "center" });
 
-doc.end();
+    let rowY = tableTop + 24;
+    let totalMarks = 0;
+    let count = 0;
+
+    exam.subjectResults.forEach((subj, idx) => {
+      const rowBg = idx % 2 === 0 ? "#ffffff" : "#f8fbf8";
+      doc.rect(40, rowY, 515, rowH).fillAndStroke(rowBg, borderColor);
+
+      // Vertical column dividers
+      doc.strokeColor(borderColor).lineWidth(0.5);
+      doc.moveTo(colDiv1, rowY).lineTo(colDiv1, rowY + rowH).stroke();
+      doc.moveTo(colDiv2, rowY).lineTo(colDiv2, rowY + rowH).stroke();
+      doc.moveTo(colDiv3, rowY).lineTo(colDiv3, rowY + rowH).stroke();
+
+      const points = getPointsFromGrade(subj.grade);
+      const m = Number(subj.marks);
+      if (!isNaN(m)) {
+        totalMarks += m;
+        count++;
+      }
+
+      doc.fillColor(darkColor).font("Helvetica").fontSize(10);
+      doc.text(subj.subjectName, 50, rowY + 6);
+      doc.text(subj.marks.toString(), colDiv1, rowY + 6, { width: 100, align: "center" });
+      doc.font("Helvetica-Bold").text(subj.grade, colDiv2, rowY + 6, { width: 100, align: "center" });
+      doc.font("Helvetica").text(points.toString(), colDiv3, rowY + 6, { width: 115, align: "center" });
+
+      rowY += rowH;
+    });
+
+    // Summary Row with borders
+    const avgMarks = count > 0 ? (totalMarks / count).toFixed(1) : "N/A";
+    doc.rect(40, rowY, 515, 24).fillAndStroke("#e8f5e9", borderColor);
+    doc.strokeColor(borderColor).lineWidth(0.5);
+    doc.moveTo(colDiv1, rowY).lineTo(colDiv1, rowY + 24).stroke();
+    doc.moveTo(colDiv2, rowY).lineTo(colDiv2, rowY + 24).stroke();
+    doc.moveTo(colDiv3, rowY).lineTo(colDiv3, rowY + 24).stroke();
+
+    doc.fillColor(primaryColor).font("Helvetica-Bold").fontSize(10);
+    doc.text("TOTAL / AVERAGE:", 45, rowY + 7, { width: 190, align: "center" });
+    doc.text(`${totalMarks} (Avg: ${avgMarks}%)`, colDiv1, rowY + 7, { width: 100, align: "center" });
+    doc.text(`Overall: ${exam.overallGrade || "N/A"}`, colDiv2, rowY + 7, { width: 100, align: "center" });
+    doc.text("-", colDiv3, rowY + 7, { width: 115, align: "center" });
+
+    // Outer table border
+    doc.rect(40, tableTop, 515, rowY + 24 - tableTop).strokeColor(primaryColor).lineWidth(1).stroke();
+    rowY += 34;
+
+    // Comment Box
+    doc.rect(40, rowY, 515, 40).fillAndStroke("#f1f8e9", "#c8e6c9");
+    doc.fillColor(primaryColor).font("Helvetica-Bold").fontSize(10);
+    doc.text("Teacher's Remark:", 50, rowY + 8);
+    doc.fillColor(darkColor).font("Helvetica-Oblique").fontSize(9.5);
+    doc.text(`"${exam.overallComment || "Good progress. Keep working hard."}"`, 50, rowY + 22);
+
+    doc.end();
 
   } catch (err) {
     console.error("Error generating PDF:", err);
