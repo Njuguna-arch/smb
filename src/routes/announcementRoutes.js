@@ -1,13 +1,24 @@
 import express from "express";
 import multer from "multer";
+import fs from "fs";
 import Announcement from "../models/AnnouncementModel.js";
+import { authenticateToken } from "../middleware/authMiddleware.js";
+import { uploadMessage, handleBulkMessage } from "./messageRoutes.js";
 
 const router = express.Router();
+
+const announcementUploadDir = "uploads/announcements";
+if (!fs.existsSync(announcementUploadDir)) {
+  fs.mkdirSync(announcementUploadDir, { recursive: true });
+}
 
 // configure multer storage
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
-    cb(null, "uploads/announcements");
+    if (!fs.existsSync(announcementUploadDir)) {
+      fs.mkdirSync(announcementUploadDir, { recursive: true });
+    }
+    cb(null, announcementUploadDir);
   },
   filename: (req, file, cb) => {
     cb(null, Date.now() + "-" + file.originalname);
@@ -56,4 +67,7 @@ router.post("/file", upload.single("file"), async (req, res) => {
   }
 });
 
-export default router;
+// POST bulk message (SMS/WhatsApp)
+router.post("/bulk", authenticateToken, uploadMessage.single("file"), handleBulkMessage);
+
+export default router;

@@ -80,14 +80,15 @@ app.use("/api/quizzes", quizRoutes);
 app.use("/api/exams", examRoutes);
 app.use("/api/videos", videoRoutes);
 app.use("/api/discipline", disciplineRoutes);
+app.use("/api/admin/announcements", announcementRoutes);
+app.use("/api/admin/messages", messageRoutes);
+app.use("/api/messages", messageRoutes);
 app.use("/api/admin", adminRoutes);
 app.use("/api/teacher", teacherRoutes);
 app.use("/api/users", userRoutes);
 app.use("/api/students", studentRoutes);
 app.use("/api/debug", debugRoutes);
-app.use("/api/admin/announcements", announcementRoutes);
 app.use("/api/superadmin", superAdminRoutes);
-app.use("/api/messages", messageRoutes);
 
 // Error handler
 app.use((err, req, res, next) => {
