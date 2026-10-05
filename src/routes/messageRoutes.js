@@ -4,6 +4,7 @@ import * as xlsx from "xlsx";
 import SentMessage from "../models/SentMessage.js";
 import fs from "fs";
 import { authenticateToken } from "../middleware/authMiddleware.js";
+import sendCelcomSms from "../utils/celcomSms.js";
 
 const router = express.Router();
 
@@ -65,11 +66,22 @@ router.post("/bulk", authenticateToken, upload.single("file"), async (req, res) 
     if (uniqueContacts.length === 0) return res.status(400).json({ error: "No valid contacts provided" });
 
     if (channel === "sms") {
-      const { AFRICASTALKING_USERNAME, AFRICASTALKING_API_KEY } = process.env;
-      if (AFRICASTALKING_USERNAME && AFRICASTALKING_API_KEY) {
-        const africastalkingModule = await import("africastalking");
-        const africastalking = africastalkingModule.default({ apiKey: AFRICASTALKING_API_KEY, username: AFRICASTALKING_USERNAME });
-        try { await africastalking.SMS.send({ to: uniqueContacts, message }); } catch (err) { console.error(err); }
+      if (process.env.CELCOM_API_KEY) {
+        try {
+          const smsResult = await sendCelcomSms({ to: uniqueContacts, message });
+          if (!smsResult.success) {
+            console.error("Celcom SMS Error:", smsResult.error, smsResult.data);
+          }
+        } catch (err) {
+          console.error("Celcom SMS Failed:", err.message);
+        }
+      } else {
+        const { AFRICASTALKING_USERNAME, AFRICASTALKING_API_KEY } = process.env;
+        if (AFRICASTALKING_USERNAME && AFRICASTALKING_API_KEY) {
+          const africastalkingModule = await import("africastalking");
+          const africastalking = africastalkingModule.default({ apiKey: AFRICASTALKING_API_KEY, username: AFRICASTALKING_USERNAME });
+          try { await africastalking.SMS.send({ to: uniqueContacts, message }); } catch (err) { console.error(err); }
+        }
       }
     }
 

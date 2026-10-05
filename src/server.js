@@ -20,6 +20,7 @@ import studentRoutes from "./routes/studentRoutes.js";
 import debugRoutes from "./routes/debugRoutes.js";
 import announcementRoutes from "./routes/announcementRoutes.js";
 import superAdminRoutes from "./routes/superAdminRoutes.js";
+import messageRoutes from "./routes/messageRoutes.js";
 
 dotenv.config();
 connectDB();
@@ -86,6 +87,7 @@ app.use("/api/students", studentRoutes);
 app.use("/api/debug", debugRoutes);
 app.use("/api/admin/announcements", announcementRoutes);
 app.use("/api/superadmin", superAdminRoutes);
+app.use("/api/messages", messageRoutes);
 
 // Error handler
 app.use((err, req, res, next) => {
