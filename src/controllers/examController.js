@@ -351,44 +351,91 @@ const getClassPerformance = async (req, res) => {
 const getSchoolPerformance = async (req, res) => {
   try {
     const { examType, term, year } = req.query;
-    const results = await ExamResult.find({ examType, term, year });
 
-    if (!results || results.length === 0) {
-      return res.json({ performance: [], totalScore: 0, meanScore: 0 });
+    const filter = {};
+    if (examType && examType.trim()) {
+      filter.examType = { $regex: new RegExp(`^${examType.trim()}$`, "i") };
+    }
+    if (term && term.trim()) {
+      filter.term = { $regex: new RegExp(`^${term.trim()}$`, "i") };
+    }
+    if (year && !isNaN(Number(year))) {
+      filter.year = Number(year);
     }
 
-    const subjectTotals = {};
-    const subjectCounts = {};
-    let totalScore = 0;
-    let totalMarksCount = 0;
+    const results = await ExamResult.find(filter);
 
-    results.forEach((exam) => {
-      exam.subjectResults.forEach((subj) => {
-        subjectTotals[subj.subjectName] =
-          (subjectTotals[subj.subjectName] || 0) + subj.marks;
-        subjectCounts[subj.subjectName] =
-          (subjectCounts[subj.subjectName] || 0) + 1;
+    const isPrimary = (className) => {
+      const match = (className || "").match(/\d+/);
+      if (!match) return false;
+      const gradeNum = parseInt(match[0], 10);
+      return gradeNum >= 1 && gradeNum <= 6;
+    };
 
-        totalScore += subj.marks;
-        totalMarksCount++;
+    const isJunior = (className) => {
+      const match = (className || "").match(/\d+/);
+      if (!match) return false;
+      const gradeNum = parseInt(match[0], 10);
+      return gradeNum >= 7 && gradeNum <= 9;
+    };
+
+    const computeGroupPerformance = (docs) => {
+      if (!docs || docs.length === 0) {
+        return { performance: [], totalScore: 0, meanScore: 0 };
+      }
+      const subjectTotals = {};
+      const subjectCounts = {};
+      let totalScore = 0;
+      let totalMarksCount = 0;
+
+      docs.forEach((exam) => {
+        (exam.subjectResults || []).forEach((subj) => {
+          const name = subj.subjectName || subj.subject;
+          const marks = Number(subj.marks || subj.score || 0);
+          if (name) {
+            subjectTotals[name] = (subjectTotals[name] || 0) + marks;
+            subjectCounts[name] = (subjectCounts[name] || 0) + 1;
+            totalScore += marks;
+            totalMarksCount++;
+          }
+        });
       });
+
+      const performance = Object.keys(subjectTotals).map((subject) => ({
+        subject,
+        average: Number(
+          (subjectTotals[subject] / subjectCounts[subject]).toFixed(2)
+        ),
+      }));
+
+      const meanScore =
+        totalMarksCount > 0
+          ? Number((totalScore / totalMarksCount).toFixed(2))
+          : 0;
+
+      return { performance, totalScore, meanScore };
+    };
+
+    const primaryDocs = results.filter((r) => isPrimary(r.className));
+    const juniorDocs = results.filter((r) => isJunior(r.className));
+
+    const primary = computeGroupPerformance(primaryDocs);
+    const juniorSecondary = computeGroupPerformance(juniorDocs);
+    const overall = computeGroupPerformance(results);
+
+    res.json({
+      primary,
+      juniorSecondary,
+      performance: overall.performance,
+      totalScore: overall.totalScore,
+      meanScore: overall.meanScore,
     });
-
-    const performance = Object.keys(subjectTotals).map((subject) => ({
-      subject,
-      average: Number(
-        (subjectTotals[subject] / subjectCounts[subject]).toFixed(2)
-      ),
-    }));
-
-    const meanScore = Number((totalScore / totalMarksCount).toFixed(2));
-
-    res.json({ performance, totalScore, meanScore });
   } catch (err) {
     console.error("Error computing school performance:", err.message);
     res.status(500).json({ message: "Server error" });
   }
 };
+
 
 export {
   uploadExamResults,

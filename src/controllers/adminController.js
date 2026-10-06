@@ -125,3 +125,37 @@ export const createAnnouncement = async (req, res) => {
     res.status(400).json({ message: "Failed to create announcement", error: err.message });
   }
 };
+
+export const getExamTypes = async (req, res) => {
+  try {
+    const types = await ExamResult.distinct("examType");
+    const defaults = ["Mid-Term", "End-Term", "Opener"];
+    const merged = Array.from(new Set([...defaults, ...types.filter(Boolean)]));
+    res.json(merged);
+  } catch (err) {
+    res.json(["Mid-Term", "End-Term", "Opener"]);
+  }
+};
+
+export const getTerms = async (req, res) => {
+  try {
+    const terms = await ExamResult.distinct("term");
+    const defaults = ["Term 1", "Term 2", "Term 3"];
+    const merged = Array.from(new Set([...defaults, ...terms.filter(Boolean)]));
+    res.json(merged);
+  } catch (err) {
+    res.json(["Term 1", "Term 2", "Term 3"]);
+  }
+};
+
+export const getYears = async (req, res) => {
+  try {
+    const years = await ExamResult.distinct("year");
+    const currentYear = new Date().getFullYear();
+    const defaults = [currentYear, 2026, 2027, 2028];
+    const merged = Array.from(new Set([...years.filter(Boolean), ...defaults])).sort((a, b) => b - a);
+    res.json(merged);
+  } catch (err) {
+    res.json([new Date().getFullYear()]);
+  }
+};
