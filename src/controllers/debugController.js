@@ -1,4 +1,6 @@
 import PDFDocument from "pdfkit";
+import User from "../models/User.js";
+import ExamResult from "../models/ExamResult.js";
 
 export const testPDF = (req, res) => {
   const doc = new PDFDocument();
@@ -63,7 +65,7 @@ export const testPDFOneRow = (req, res) => {
 
 export const generateStudentReportPDF = async (req, res) => {
   try {
-    const {
+    let {
       name = "Student",
       admission = "N/A",
       examType = "Exam Results",
@@ -71,8 +73,76 @@ export const generateStudentReportPDF = async (req, res) => {
       position = "N/A",
       subjects = [],
       comment = "Good progress",
-      schoolName = "EDUSPHERE ACADEMY",
+      schoolName = "LISKAN JOY ACADEMY",
     } = req.body;
+
+    // Ensure EDUSPHERE is renamed to LISKAN JOY
+    schoolName = (schoolName || "LISKAN JOY ACADEMY").replace(/EDUSPHERE/gi, "LISKAN JOY");
+
+    // Look up student name from User model if missing or default
+    if (!name || name === "Student" || name === "N/A") {
+      if (admission && admission !== "N/A") {
+        try {
+          const cleanAdm = admission.trim();
+          const admRegex = cleanAdm.startsWith("LA")
+            ? new RegExp(`^(${cleanAdm}|${cleanAdm.replace(/^LA/i, "")})$`, "i")
+            : new RegExp(`^(LA)?${cleanAdm}$`, "i");
+          const studentUser = await User.findOne({ admissionNumber: admRegex }).lean();
+          if (studentUser && studentUser.name) {
+            name = studentUser.name;
+          }
+        } catch (err) {
+          console.error("Error looking up student user:", err);
+        }
+      }
+    }
+
+    // Compute Position / Rank based on their class if missing or N/A
+    if (!position || position === "N/A") {
+      if (admission && admission !== "N/A") {
+        try {
+          const cleanAdm = admission.trim();
+          const admRegex = cleanAdm.startsWith("LA")
+            ? new RegExp(`^(${cleanAdm}|${cleanAdm.replace(/^LA/i, "")})$`, "i")
+            : new RegExp(`^(LA)?${cleanAdm}$`, "i");
+
+          const studentExams = await ExamResult.find({ admissionNumber: admRegex }).lean();
+          if (studentExams && studentExams.length > 0) {
+            const matchedExam =
+              studentExams.find((e) => {
+                const combo = `${e.examType} ${e.term} ${e.year}`.toLowerCase();
+                return (
+                  combo === String(examType).toLowerCase() ||
+                  e.examType?.toLowerCase() === String(examType).toLowerCase()
+                );
+              }) || studentExams[0];
+
+            if (matchedExam && matchedExam.className) {
+              const classExams = await ExamResult.find({
+                className: new RegExp(`^${matchedExam.className.trim()}$`, "i"),
+                examType: new RegExp(`^${matchedExam.examType?.trim()}$`, "i"),
+                term: new RegExp(`^${matchedExam.term?.trim()}$`, "i"),
+                year: Number(matchedExam.year),
+              }).lean();
+
+              if (classExams && classExams.length > 0) {
+                const getScore = (e) =>
+                  (e.subjectResults || []).reduce(
+                    (sum, s) => sum + (Number(s.marks) || 0),
+                    0
+                  );
+                const targetScore = getScore(matchedExam);
+                const rank =
+                  classExams.filter((e) => getScore(e) > targetScore).length + 1;
+                position = `${rank} / ${classExams.length}`;
+              }
+            }
+          }
+        } catch (err) {
+          console.error("Error calculating class position:", err);
+        }
+      }
+    }
 
     const doc = new PDFDocument({
       size: "A4",

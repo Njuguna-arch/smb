@@ -129,7 +129,66 @@ const uploadExamResults = async (req, res) => {
 const getStudentResults = async (req, res) => {
   try {
     const admissionNumber = req.params.admissionNumber;
-    const results = await ExamResult.find({ admissionNumber }).sort({ createdAt: -1 });
+    const cleanAdm = admissionNumber ? admissionNumber.trim() : "";
+    const admRegex = cleanAdm.startsWith("LA")
+      ? new RegExp(`^(${cleanAdm}|${cleanAdm.replace(/^LA/i, "")})$`, "i")
+      : new RegExp(`^(LA)?${cleanAdm}$`, "i");
+
+    const rawResults = await ExamResult.find({ admissionNumber: admRegex })
+      .populate("studentId", "name admissionNumber grade photoUrl")
+      .sort({ createdAt: -1 })
+      .lean();
+
+    const studentUser = await User.findOne({ admissionNumber: admRegex }).lean();
+
+    const results = await Promise.all(
+      rawResults.map(async (exam) => {
+        let sId = exam.studentId;
+        if (!sId || typeof sId === "string" || !sId.name) {
+          sId = studentUser
+            ? {
+                _id: studentUser._id,
+                name: studentUser.name,
+                admissionNumber: studentUser.admissionNumber,
+                grade: studentUser.grade,
+              }
+            : { name: "Student" };
+        }
+
+        let position = exam.position;
+        if (!position || position === "N/A") {
+          try {
+            const classFilter = {
+              className: new RegExp(`^${exam.className?.trim()}$`, "i"),
+              examType: new RegExp(`^${exam.examType?.trim()}$`, "i"),
+              term: new RegExp(`^${exam.term?.trim()}$`, "i"),
+              year: Number(exam.year),
+            };
+            const classExams = await ExamResult.find(classFilter).lean();
+            if (classExams && classExams.length > 0) {
+              const getScore = (e) =>
+                (e.subjectResults || []).reduce(
+                  (sum, s) => sum + (Number(s.marks) || 0),
+                  0
+                );
+              const targetScore = getScore(exam);
+              const rank =
+                classExams.filter((e) => getScore(e) > targetScore).length + 1;
+              position = `${rank} / ${classExams.length}`;
+            }
+          } catch (rankErr) {
+            console.error("Error computing rank:", rankErr);
+          }
+        }
+
+        return {
+          ...exam,
+          studentId: sId,
+          position: position || "N/A",
+        };
+      })
+    );
+
     res.json(results);
   } catch (err) {
     console.error("Error fetching student results:", err.message);
@@ -153,10 +212,44 @@ const getExamResultPDF = async (req, res) => {
       year: Number(year),
     };
 
-    const exam = await ExamResult.findOne(query).populate("studentId");
+    const exam = await ExamResult.findOne(query).populate("studentId").lean();
 
     if (!exam) {
       return res.status(404).json({ message: "Exam not found" });
+    }
+
+    let studentName = exam.studentId?.name;
+    if (!studentName || studentName === "Student") {
+      const studentUser = await User.findOne({ admissionNumber: admRegex }).lean();
+      if (studentUser && studentUser.name) studentName = studentUser.name;
+    }
+    if (!studentName) studentName = "Student";
+
+    // Compute Position / Rank based on class
+    let position = exam.position;
+    if (!position || position === "N/A") {
+      try {
+        const classFilter = {
+          className: new RegExp(`^${exam.className?.trim()}$`, "i"),
+          examType: new RegExp(`^${exam.examType?.trim()}$`, "i"),
+          term: new RegExp(`^${exam.term?.trim()}$`, "i"),
+          year: Number(exam.year),
+        };
+        const classExams = await ExamResult.find(classFilter).lean();
+        if (classExams && classExams.length > 0) {
+          const getScore = (e) =>
+            (e.subjectResults || []).reduce(
+              (sum, s) => sum + (Number(s.marks) || 0),
+              0
+            );
+          const targetScore = getScore(exam);
+          const rank =
+            classExams.filter((e) => getScore(e) > targetScore).length + 1;
+          position = `${rank} / ${classExams.length}`;
+        }
+      } catch (err) {
+        console.error("Error computing class rank in getExamResultPDF:", err);
+      }
     }
 
     res.setHeader("Content-Type", "application/pdf");
@@ -173,35 +266,40 @@ const getExamResultPDF = async (req, res) => {
     const borderColor = "#cfd8dc";
 
     // Top Header Banner in Green
-    doc.rect(40, 36, 515, 68).fill(primaryColor);
+    doc.rect(40, 36, 515, 70).fill(primaryColor);
     doc.fillColor("#ffffff").font("Helvetica-Bold").fontSize(18);
-    doc.text("EDUSPHERE ACADEMY", 40, 46, { width: 515, align: "center" });
+    doc.text("LISKAN JOY ACADEMY", 40, 46, { width: 515, align: "center" });
 
     // Student Name in the middle of the header
-    const studentName = exam.studentId?.name || "Student";
     doc.fontSize(13);
     doc.text(`STUDENT: ${studentName.toUpperCase()}`, 40, 68, { width: 515, align: "center" });
     doc.fontSize(9.5).font("Helvetica");
-    doc.text(`EXAM REPORT CARD — ${examType.toUpperCase()} ${term.toUpperCase()} ${year}`, 40, 87, { width: 515, align: "center" });
+    doc.text("OFFICIAL STUDENT EXAM REPORT CARD", 40, 88, { width: 515, align: "center" });
 
     // Student Info Card
-    const infoY = 114;
-    doc.rect(40, infoY, 515, 65).fillAndStroke("#ffffff", borderColor);
+    const infoY = 116;
+    doc.rect(40, infoY, 515, 75).fillAndStroke("#ffffff", borderColor);
     doc.fillColor(darkColor).fontSize(10);
-    doc.font("Helvetica-Bold").text("Admission No:", 55, infoY + 12);
-    doc.font("Helvetica").text(exam.admissionNumber, 155, infoY + 12);
+    doc.font("Helvetica-Bold").text("Student Name:", 55, infoY + 12);
+    doc.font("Helvetica").text(studentName, 155, infoY + 12);
 
-    doc.font("Helvetica-Bold").text("Class / Grade:", 55, infoY + 34);
-    doc.font("Helvetica").text(exam.className || "N/A", 155, infoY + 34);
+    doc.font("Helvetica-Bold").text("Admission No:", 55, infoY + 32);
+    doc.font("Helvetica").text(exam.admissionNumber, 155, infoY + 32);
+
+    doc.font("Helvetica-Bold").text("Exam / Period:", 55, infoY + 52);
+    doc.font("Helvetica").text(`${examType} ${term} ${year}`, 155, infoY + 52);
 
     doc.font("Helvetica-Bold").text("Overall Grade:", 330, infoY + 12);
     doc.font("Helvetica-Bold").fillColor(primaryColor).text(exam.overallGrade || "N/A", 430, infoY + 12);
 
-    doc.fillColor(darkColor).font("Helvetica-Bold").text("Date Issued:", 330, infoY + 34);
-    doc.font("Helvetica").text(new Date().toLocaleDateString("en-GB"), 430, infoY + 34);
+    doc.fillColor(darkColor).font("Helvetica-Bold").text("Position / Rank:", 330, infoY + 32);
+    doc.font("Helvetica").text(position || "N/A", 430, infoY + 32);
+
+    doc.font("Helvetica-Bold").text("Date Issued:", 330, infoY + 52);
+    doc.font("Helvetica").text(new Date().toLocaleDateString("en-GB"), 430, infoY + 52);
 
     // Table with complete cell borders
-    const tableTop = 190;
+    const tableTop = 205;
     const colDiv1 = 240;
     const colDiv2 = 340;
     const colDiv3 = 440;
